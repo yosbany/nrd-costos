@@ -110,16 +110,60 @@ function setupNavButtons() {
   logger.debug('Nav button handlers attached');
 }
 
+// Helper function to wait for services to be available
+function waitForServices(maxWait = 5000) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    const checkServices = () => {
+      const nrdInstance = typeof nrd !== 'undefined' ? nrd : window.nrd;
+      if (!nrdInstance) {
+        if (Date.now() - startTime >= maxWait) {
+          reject(new Error('NRD instance not found'));
+          return;
+        }
+        setTimeout(checkServices, 100);
+        return;
+      }
+      
+      const servicesAvailable = nrdInstance.products && nrdInstance.recipes && 
+                                nrdInstance.inputs && nrdInstance.laborRoles && 
+                                nrdInstance.indirectCosts;
+      
+      if (servicesAvailable) {
+        resolve(nrdInstance);
+      } else if (Date.now() - startTime >= maxWait) {
+        reject(new Error('Services not available after timeout'));
+      } else {
+        setTimeout(checkServices, 100);
+      }
+    };
+    checkServices();
+  });
+}
+
 // Initialize app using NRD Data Access
 nrd.auth.onAuthStateChanged((user) => {
   if (user) {
     logger.info('User authenticated, initializing app', { uid: user.uid, email: user.email });
-    // Setup nav buttons after DOM is ready
-    setTimeout(() => {
-      setupNavButtons();
-      // Default to dashboard view
-      switchView('dashboard');
-    }, 100);
+    // Wait for services to be available, then setup nav buttons and default view
+    waitForServices(5000)
+      .then(() => {
+        logger.debug('Services available, setting up app');
+        // Setup nav buttons after DOM is ready
+        setTimeout(() => {
+          setupNavButtons();
+          // Default to dashboard view
+          switchView('dashboard');
+        }, 100);
+      })
+      .catch((error) => {
+        logger.error('Failed to initialize services', error);
+        // Still setup nav buttons, but show error in dashboard
+        setTimeout(() => {
+          setupNavButtons();
+          switchView('dashboard');
+        }, 100);
+      });
   } else {
     logger.debug('User not authenticated, app initialization skipped');
   }

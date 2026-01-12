@@ -391,6 +391,9 @@ async function renderDashboard() {
 }
 
 // Initialize dashboard tab
+let initializeDashboardRetryCount = 0;
+const MAX_RETRIES = 10; // Maximum 10 retries (3 seconds total)
+
 function initializeDashboard() {
   // Use window.nrd if nrd is not defined in this scope
   const nrdInstance = typeof nrd !== 'undefined' ? nrd : window.nrd;
@@ -411,24 +414,75 @@ function initializeDashboard() {
       `;
     }
     console.error('nrd instance not found. window.nrd:', window.nrd);
+    initializeDashboardRetryCount = 0; // Reset counter on return
     return;
   }
   
   // Check if services are available
-  if (!nrdInstance.products || !nrdInstance.recipes || !nrdInstance.inputs || !nrdInstance.laborRoles || !nrdInstance.indirectCosts) {
+  const servicesStatus = {
+    products: !!nrdInstance.products,
+    recipes: !!nrdInstance.recipes,
+    inputs: !!nrdInstance.inputs,
+    laborRoles: !!nrdInstance.laborRoles,
+    indirectCosts: !!nrdInstance.indirectCosts
+  };
+  
+  const allServicesAvailable = servicesStatus.products && servicesStatus.recipes && 
+                                servicesStatus.inputs && servicesStatus.laborRoles && 
+                                servicesStatus.indirectCosts;
+  
+  if (!allServicesAvailable) {
+    initializeDashboardRetryCount++;
+    
+    if (initializeDashboardRetryCount >= MAX_RETRIES) {
+      // Maximum retries reached, show error message
+      logger.error('Services not available after maximum retries', servicesStatus);
+      const dashboardContent = document.getElementById('dashboard-content');
+      if (dashboardContent) {
+        const missingServices = [];
+        if (!servicesStatus.products) missingServices.push('products');
+        if (!servicesStatus.recipes) missingServices.push('recipes');
+        if (!servicesStatus.inputs) missingServices.push('inputs');
+        if (!servicesStatus.laborRoles) missingServices.push('laborRoles');
+        if (!servicesStatus.indirectCosts) missingServices.push('indirectCosts');
+        
+        dashboardContent.innerHTML = `
+          <div class="bg-red-50 border border-red-200 p-4 sm:p-6 rounded text-center">
+            <p class="text-red-700 text-sm sm:text-base mb-2">
+              ⚠️ Error: Servicios no disponibles
+            </p>
+            <p class="text-red-600 text-xs sm:text-sm mb-2">
+              Los siguientes servicios no están disponibles en la librería:
+            </p>
+            <ul class="text-red-600 text-xs sm:text-sm text-left list-disc list-inside mb-3">
+              ${missingServices.map(s => `<li>${s}</li>`).join('')}
+            </ul>
+            <p class="text-red-600 text-xs sm:text-sm">
+              Verifica que la versión de la librería NRD Data Access incluya estos servicios.
+              Los servicios disponibles son: ${Object.keys(nrdInstance).filter(k => typeof nrdInstance[k] === 'object' && nrdInstance[k] !== null && 'getAll' in nrdInstance[k]).join(', ')}
+            </p>
+          </div>
+        `;
+      }
+      initializeDashboardRetryCount = 0; // Reset counter
+      return;
+    }
+    
     logger.warn('Services not available yet, retrying...', {
-      products: !!nrdInstance.products,
-      recipes: !!nrdInstance.recipes,
-      inputs: !!nrdInstance.inputs,
-      laborRoles: !!nrdInstance.laborRoles,
-      indirectCosts: !!nrdInstance.indirectCosts
+      ...servicesStatus,
+      retryCount: initializeDashboardRetryCount,
+      maxRetries: MAX_RETRIES
     });
+    
     // Retry after a short delay
     setTimeout(() => {
       initializeDashboard();
     }, 300);
     return;
   }
+  
+  // Reset counter on success
+  initializeDashboardRetryCount = 0;
 
   // Setup listeners for real-time updates
   if (dashboardProductsListener) dashboardProductsListener();
