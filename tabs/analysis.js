@@ -206,38 +206,21 @@ async function renderAnalysisTable() {
     return 0;
   });
 
-  // Render table
-  let tableHtml = `
-    <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="border-b border-gray-300">
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Producto</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Costo Directo Unit.</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Costo Indirecto Unit.</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Costo Total Unit.</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Precio Actual</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Precio Sugerido</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Margen Real</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Estado</th>
-            <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Simular</th>
-          </tr>
-        </thead>
-        <tbody>
+  // Render cards
+  let cardsHtml = `
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
   `;
 
   analyses.forEach(analysis => {
     if (!analysis.hasRecipe) {
-      tableHtml += `
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="px-3 py-2 text-sm">${escapeHtml(analysis.product.name)}</td>
-          <td class="px-3 py-2 text-sm text-gray-500" colspan="7">${escapeHtml(analysis.message)}</td>
-          <td class="px-3 py-2 text-sm">
-            <button class="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors" disabled>
-              Simular
-            </button>
-          </td>
-        </tr>
+      cardsHtml += `
+        <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
+          <h3 class="text-sm sm:text-base font-medium text-gray-800 mb-2">${escapeHtml(analysis.product.name)}</h3>
+          <p class="text-xs sm:text-sm text-gray-500 mb-3">${escapeHtml(analysis.message)}</p>
+          <button class="w-full px-3 py-2 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors" disabled>
+            Simular
+          </button>
+        </div>
       `;
       return;
     }
@@ -248,45 +231,71 @@ async function renderAnalysisTable() {
       ? 'text-orange-600' 
       : 'text-green-600';
 
+    const statusBg = analysis.profitabilityStatus === 'loss'
+      ? 'bg-red-100 text-red-700 border-red-200'
+      : analysis.profitabilityStatus === 'low-margin'
+      ? 'bg-orange-100 text-orange-700 border-orange-200'
+      : 'bg-green-100 text-green-700 border-green-200';
+
+    const statusBorder = analysis.profitabilityStatus === 'loss'
+      ? 'border-red-200'
+      : analysis.profitabilityStatus === 'low-margin'
+      ? 'border-orange-200'
+      : 'border-green-200';
+
     const statusLabel = analysis.profitabilityStatus === 'loss'
       ? 'Pérdida'
       : analysis.profitabilityStatus === 'low-margin'
       ? 'Margen Bajo'
       : 'Rentable';
 
-    tableHtml += `
-      <tr class="border-b border-gray-200 hover:bg-gray-50" data-product-id="${analysis.product.id}">
-        <td class="px-3 py-2 text-sm font-medium">${escapeHtml(analysis.product.name)}</td>
-        <td class="px-3 py-2 text-sm">$${analysis.directUnitCost.toFixed(2)}</td>
-        <td class="px-3 py-2 text-sm">$${analysis.indirectUnitCost.toFixed(2)}</td>
-        <td class="px-3 py-2 text-sm font-medium">$${analysis.totalUnitCost.toFixed(2)}</td>
-        <td class="px-3 py-2 text-sm">$${analysis.currentPrice.toFixed(2)}</td>
-        <td class="px-3 py-2 text-sm text-blue-600">$${analysis.suggestedPrice.toFixed(2)}</td>
-        <td class="px-3 py-2 text-sm ${statusColor} font-medium">${analysis.realMargin.toFixed(1)}%</td>
-        <td class="px-3 py-2 text-sm">
-          <span class="px-2 py-1 text-xs rounded ${analysis.profitabilityStatus === 'loss' ? 'bg-red-100 text-red-700' : analysis.profitabilityStatus === 'low-margin' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">
-            ${statusLabel}
-          </span>
-        </td>
-        <td class="px-3 py-2 text-sm">
-          <button class="simulate-price-btn px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors" 
-            data-product-id="${analysis.product.id}"
-            data-total-cost="${analysis.totalUnitCost}"
-            data-current-price="${analysis.currentPrice}">
-            Simular
-          </button>
-        </td>
-      </tr>
+    cardsHtml += `
+      <div class="bg-white border ${statusBorder} rounded p-3 sm:p-4 shadow-sm" data-product-id="${analysis.product.id}">
+        <div class="flex items-start justify-between mb-3">
+          <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">${escapeHtml(analysis.product.name)}</h3>
+          <span class="px-2 py-1 text-xs rounded ${statusBg} ml-2 whitespace-nowrap">${statusLabel}</span>
+        </div>
+        <div class="space-y-2 text-xs sm:text-sm mb-4">
+          <div class="flex justify-between items-center py-1 border-b border-gray-100">
+            <span class="text-gray-600">Costo Directo:</span>
+            <span class="font-medium">$${analysis.directUnitCost.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center py-1 border-b border-gray-100">
+            <span class="text-gray-600">Costo Indirecto:</span>
+            <span class="font-medium">$${analysis.indirectUnitCost.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center py-1 border-b border-gray-100">
+            <span class="text-gray-600">Costo Total:</span>
+            <span class="font-medium text-red-600">$${analysis.totalUnitCost.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center py-1 border-b border-gray-100">
+            <span class="text-gray-600">Precio Actual:</span>
+            <span class="font-medium">$${analysis.currentPrice.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center py-1 border-b border-gray-100">
+            <span class="text-gray-600">Precio Sugerido:</span>
+            <span class="font-medium text-blue-600">$${analysis.suggestedPrice.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center py-1">
+            <span class="text-gray-600">Margen Real:</span>
+            <span class="font-medium ${statusColor}">${analysis.realMargin.toFixed(1)}%</span>
+          </div>
+        </div>
+        <button class="simulate-price-btn w-full px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors" 
+          data-product-id="${analysis.product.id}"
+          data-total-cost="${analysis.totalUnitCost}"
+          data-current-price="${analysis.currentPrice}">
+          Simular Precio
+        </button>
+      </div>
     `;
   });
 
-  tableHtml += `
-        </tbody>
-      </table>
+  cardsHtml += `
     </div>
   `;
 
-  analysisTable.innerHTML = tableHtml;
+  analysisTable.innerHTML = cardsHtml;
 
   // Attach event listeners for simulate buttons
   document.querySelectorAll('.simulate-price-btn').forEach(btn => {

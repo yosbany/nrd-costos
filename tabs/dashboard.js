@@ -219,57 +219,55 @@ async function renderDashboard() {
         </div>
       </div>
       ${productsWithIssues.length > 0 ? `
-      <div class="bg-white border border-gray-200 rounded overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-200">
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Producto</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Problema</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Margen</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Precio Actual</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Precio Sugerido</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${productsWithIssues.slice(0, 10).map(issue => {
-                const severityColor = issue.severity === 'high' 
-                  ? 'text-red-600' 
-                  : issue.severity === 'medium' 
-                  ? 'text-orange-600' 
-                  : 'text-yellow-600';
-                
-                const severityBg = issue.severity === 'high'
-                  ? 'bg-red-100 text-red-700'
-                  : issue.severity === 'medium'
-                  ? 'bg-orange-100 text-orange-700'
-                  : 'bg-yellow-100 text-yellow-700';
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        ${productsWithIssues.slice(0, 10).map(issue => {
+          const severityColor = issue.severity === 'high' 
+            ? 'text-red-600' 
+            : issue.severity === 'medium' 
+            ? 'text-orange-600' 
+            : 'text-yellow-600';
+          
+          const severityBg = issue.severity === 'high'
+            ? 'bg-red-100 text-red-700 border-red-200'
+            : issue.severity === 'medium'
+            ? 'bg-orange-100 text-orange-700 border-orange-200'
+            : 'bg-yellow-100 text-yellow-700 border-yellow-200';
 
-                const issueLabel = issue.issue === 'loss'
-                  ? 'Pérdida'
-                  : issue.issue === 'low-margin'
-                  ? 'Margen Bajo'
-                  : 'Sin Receta';
+          const severityBorder = issue.severity === 'high'
+            ? 'border-red-200'
+            : issue.severity === 'medium'
+            ? 'border-orange-200'
+            : 'border-yellow-200';
 
-                return `
-                  <tr class="border-b border-gray-200 hover:bg-gray-50">
-                    <td class="px-3 py-2 text-sm font-medium">${escapeHtml(issue.product.name)}</td>
-                    <td class="px-3 py-2 text-sm">
-                      <span class="px-2 py-1 text-xs rounded ${severityBg}">${issueLabel}</span>
-                    </td>
-                    <td class="px-3 py-2 text-sm ${severityColor}">
-                      ${issue.realMargin !== undefined ? `${issue.realMargin.toFixed(1)}%` : '-'}
-                    </td>
-                    <td class="px-3 py-2 text-sm">${issue.price !== undefined ? `$${issue.price.toFixed(2)}` : '-'}</td>
-                    <td class="px-3 py-2 text-sm text-blue-600">
-                      ${issue.suggestedPrice !== undefined ? `$${issue.suggestedPrice.toFixed(2)}` : '-'}
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+          const issueLabel = issue.issue === 'loss'
+            ? 'Pérdida'
+            : issue.issue === 'low-margin'
+            ? 'Margen Bajo'
+            : 'Sin Receta';
+
+          return `
+            <div class="bg-white border ${severityBorder} rounded p-3 sm:p-4 shadow-sm">
+              <div class="flex items-start justify-between mb-2">
+                <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">${escapeHtml(issue.product.name)}</h3>
+                <span class="px-2 py-1 text-xs rounded ${severityBg} ml-2 whitespace-nowrap">${issueLabel}</span>
+              </div>
+              <div class="space-y-2 text-xs sm:text-sm">
+                <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span class="text-gray-600">Margen:</span>
+                  <span class="font-medium ${severityColor}">${issue.realMargin !== undefined ? `${issue.realMargin.toFixed(1)}%` : '-'}</span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span class="text-gray-600">Precio Actual:</span>
+                  <span class="font-medium">${issue.price !== undefined ? `$${issue.price.toFixed(2)}` : '-'}</span>
+                </div>
+                <div class="flex justify-between items-center py-1">
+                  <span class="text-gray-600">Precio Sugerido:</span>
+                  <span class="font-medium text-blue-600">${issue.suggestedPrice !== undefined ? `$${issue.suggestedPrice.toFixed(2)}` : '-'}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
       ` : `
       <div class="bg-green-50 border border-green-200 p-4 sm:p-6 rounded text-center">
@@ -282,31 +280,30 @@ async function renderDashboard() {
     <div class="mb-6 sm:mb-8">
       <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-4">Top 10 Insumos Más Impactantes</h2>
       ${topInputs.length > 0 ? `
-      <div class="bg-white border border-gray-200 rounded overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-200">
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Insumo</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Precio Unit.</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Impacto Total</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Recetas</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${topInputs.map((item, index) => `
-                <tr class="border-b border-gray-200 hover:bg-gray-50">
-                  <td class="px-3 py-2 text-sm">
-                    <span class="font-medium">${index + 1}.</span> ${escapeHtml(item.input.name)}
-                  </td>
-                  <td class="px-3 py-2 text-sm">$${parseFloat(item.input.unitPrice || 0).toFixed(2)}/${item.input.unit || 'unidad'}</td>
-                  <td class="px-3 py-2 text-sm font-medium">$${item.totalImpact.toFixed(2)}</td>
-                  <td class="px-3 py-2 text-sm text-gray-600">${item.recipeCount} receta(s)</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        ${topInputs.map((item, index) => `
+          <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.input.name)}
+              </h3>
+            </div>
+            <div class="space-y-2 text-xs sm:text-sm">
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Precio Unitario:</span>
+                <span class="font-medium">$${parseFloat(item.input.unitPrice || 0).toFixed(2)}/${item.input.unit || 'unidad'}</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Impacto Total:</span>
+                <span class="font-medium text-red-600">$${item.totalImpact.toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between items-center py-1">
+                <span class="text-gray-600">Recetas:</span>
+                <span class="text-gray-600">${item.recipeCount} receta(s)</span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
       ` : `
       <div class="bg-gray-50 border border-gray-200 p-4 sm:p-6 rounded text-center">
@@ -319,33 +316,34 @@ async function renderDashboard() {
     <div class="mb-6 sm:mb-8">
       <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-4">Top 10 Roles de Mano de Obra Más Impactantes</h2>
       ${topLaborRoles.length > 0 ? `
-      <div class="bg-white border border-gray-200 rounded overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-200">
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Rol</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Costo Hora</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Impacto Total</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Horas Totales</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Recetas</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${topLaborRoles.map((item, index) => `
-                <tr class="border-b border-gray-200 hover:bg-gray-50">
-                  <td class="px-3 py-2 text-sm">
-                    <span class="font-medium">${index + 1}.</span> ${escapeHtml(item.role.name)}
-                  </td>
-                  <td class="px-3 py-2 text-sm">$${parseFloat(item.role.hourlyCost || 0).toFixed(2)}/hora</td>
-                  <td class="px-3 py-2 text-sm font-medium">$${item.totalImpact.toFixed(2)}</td>
-                  <td class="px-3 py-2 text-sm text-gray-600">${item.totalHours.toFixed(2)} horas</td>
-                  <td class="px-3 py-2 text-sm text-gray-600">${item.recipeCount} receta(s)</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        ${topLaborRoles.map((item, index) => `
+          <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.role.name)}
+              </h3>
+            </div>
+            <div class="space-y-2 text-xs sm:text-sm">
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Costo Hora:</span>
+                <span class="font-medium">$${parseFloat(item.role.hourlyCost || 0).toFixed(2)}/hora</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Impacto Total:</span>
+                <span class="font-medium text-red-600">$${item.totalImpact.toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Horas Totales:</span>
+                <span class="text-gray-600">${item.totalHours.toFixed(2)} horas</span>
+              </div>
+              <div class="flex justify-between items-center py-1">
+                <span class="text-gray-600">Recetas:</span>
+                <span class="text-gray-600">${item.recipeCount} receta(s)</span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
       ` : `
       <div class="bg-gray-50 border border-gray-200 p-4 sm:p-6 rounded text-center">
@@ -358,31 +356,30 @@ async function renderDashboard() {
     <div class="mb-6 sm:mb-8">
       <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-4">Top 10 Costos Indirectos</h2>
       ${topIndirectCosts.length > 0 ? `
-      <div class="bg-white border border-gray-200 rounded overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-200">
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Costo Indirecto</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Monto Mensual</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">% del Total</th>
-                <th class="px-3 py-2 text-xs uppercase tracking-wider text-gray-600 font-light">Método</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${topIndirectCosts.map((item, index) => `
-                <tr class="border-b border-gray-200 hover:bg-gray-50">
-                  <td class="px-3 py-2 text-sm">
-                    <span class="font-medium">${index + 1}.</span> ${escapeHtml(item.cost.name)}
-                  </td>
-                  <td class="px-3 py-2 text-sm font-medium">$${parseFloat(item.cost.monthlyAmount || 0).toFixed(2)}</td>
-                  <td class="px-3 py-2 text-sm text-gray-600">${item.percentage.toFixed(1)}%</td>
-                  <td class="px-3 py-2 text-sm text-gray-600">${item.cost.prorationMethod === 'units' ? 'Por Unidades' : 'Por Horas'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        ${topIndirectCosts.map((item, index) => `
+          <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.cost.name)}
+              </h3>
+            </div>
+            <div class="space-y-2 text-xs sm:text-sm">
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">Monto Mensual:</span>
+                <span class="font-medium text-red-600">$${parseFloat(item.cost.monthlyAmount || 0).toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-gray-600">% del Total:</span>
+                <span class="text-gray-600">${item.percentage.toFixed(1)}%</span>
+              </div>
+              <div class="flex justify-between items-center py-1">
+                <span class="text-gray-600">Método:</span>
+                <span class="text-gray-600">${item.cost.prorationMethod === 'units' ? 'Por Unidades' : 'Por Horas'}</span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
       ` : `
       <div class="bg-gray-50 border border-gray-200 p-4 sm:p-6 rounded text-center">
