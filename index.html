@@ -782,7 +782,8 @@
 
     // Initialize NRD Data Access Library (make it global)
     window.nrd = new NRDDataAccess();
-    const nrd = window.nrd; // For backward compatibility in this scope
+    // Note: Don't declare nrd here to avoid conflicts with other scripts
+    // All scripts should use window.nrd directly
   </script>
   
   <!-- App Scripts -->

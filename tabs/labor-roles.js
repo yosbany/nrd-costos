@@ -1,7 +1,7 @@
 // Labor roles management
 
 // Get nrd instance safely (always use window.nrd as it's set globally in index.html)
-const nrd = window.nrd;
+var nrd = window.nrd;
 
 let laborRolesListener = null;
 let laborRolesSearchTerm = '';
