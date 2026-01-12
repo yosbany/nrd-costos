@@ -1,5 +1,8 @@
 // Input management
 
+// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
+const nrd = window.nrd;
+
 let inputsListener = null;
 let inputsSearchTerm = '';
 

@@ -1,8 +1,12 @@
 // Authentication state management
+// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
+const nrd = window.nrd;
+
 let currentUser = null;
 
 // Listen for auth state changes using NRD Data Access
-nrd.auth.onAuthStateChanged((user) => {
+if (nrd && nrd.auth) {
+  nrd.auth.onAuthStateChanged((user) => {
   try {
     currentUser = user;
     if (user) {
@@ -19,7 +23,12 @@ nrd.auth.onAuthStateChanged((user) => {
     if (loginScreen) loginScreen.classList.remove('hidden');
     if (appScreen) appScreen.classList.add('hidden');
   }
-});
+  });
+} else {
+  logger.error('nrd or nrd.auth is not available');
+  // Still show login screen if nrd is not available
+  showLoginScreen();
+}
 
 // Show login screen
 function showLoginScreen() {
@@ -73,6 +82,13 @@ if (loginForm) {
 
       logger.info('Attempting user login', { email });
       if (errorDiv) errorDiv.textContent = '';
+      
+      if (!nrd || !nrd.auth) {
+        logger.error('nrd or nrd.auth is not available');
+        if (errorDiv) errorDiv.textContent = 'Error: Servicio no disponible';
+        return;
+      }
+      
       showSpinner('Iniciando sesión...');
 
       const userCredential = await nrd.auth.signIn(email, password);
@@ -172,6 +188,12 @@ if (profileLogoutBtn) {
       const user = getCurrentUser();
       logger.info('Attempting user logout', { uid: user?.uid, email: user?.email });
       closeProfileModal();
+      
+      if (!nrd || !nrd.auth) {
+        logger.error('nrd or nrd.auth is not available');
+        return;
+      }
+      
       showSpinner('Cerrando sesión...');
       await nrd.auth.signOut();
       logger.audit('USER_LOGOUT', { uid: user?.uid, email: user?.email, timestamp: Date.now() });
@@ -186,5 +208,5 @@ if (profileLogoutBtn) {
 
 // Get current user
 function getCurrentUser() {
-  return nrd.auth.getCurrentUser() || currentUser;
+  return (nrd && nrd.auth && nrd.auth.getCurrentUser()) || currentUser;
 }

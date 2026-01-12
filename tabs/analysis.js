@@ -1,5 +1,8 @@
 // Product analysis with real-time calculations and price simulator
 
+// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
+const nrd = window.nrd;
+
 let analysisProductsListener = null;
 let analysisRecipesListener = null;
 let analysisInputsListener = null;
