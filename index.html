@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sistema de gestión de costos">
+  <title>NRD Costos</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css?v=1768190760792">
+  <meta name="theme-color" content="#dc2626">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  
+  <!-- Force cache reload with version parameter in URL -->
+  <script>
+    (function() {
+      // Get current version from stylesheet link (this is the source of truth)
+      const stylesheet = document.querySelector('link[href*="styles.css"]');
+      const versionMatch = stylesheet ? stylesheet.href.match(/[?&]v=(\d+)/) : null;
+      const currentVersion = versionMatch ? versionMatch[1] : Date.now();
+      
+      // Get version from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlVersion = urlParams.get('v');
+      
+      // If URL version doesn't match current version, reload with new version
+      if (urlVersion !== currentVersion) {
+        
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister();
+            }
+          });
+        }
+        
+        // Clear all caches
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (let name of names) {
+              caches.delete(name);
+            }
+          });
+        }
+        
+        // Reload with new version
+        const url = new URL(window.location.href);
+        url.searchParams.set('v', currentVersion);
+        window.location.replace(url.toString());
+      }
+    })();
+  </script>
+</head>
+<body class="bg-white text-black font-sans antialiased">
+  <!-- Loading Spinner -->
+  <div id="loading-spinner" class="fixed inset-0 bg-black/20 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 flex flex-col items-center gap-4 shadow-lg">
+      <div class="w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-600 font-light">Cargando...</p>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-sm">
+      <h1 class="text-xl sm:text-2xl font-light text-center mb-6 sm:mb-8 tracking-tight">NRD Costos</h1>
+      <form id="login-form" class="space-y-3 sm:space-y-4">
+        <input type="email" id="login-email" placeholder="Email" required 
+          class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+        <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password" required 
+          class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+        <button type="submit" 
+          class="w-full mt-4 sm:mt-6 py-2.5 sm:py-3 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+          Iniciar Sesión
+        </button>
+      </form>
+      <div id="login-error" class="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-gray-600"></div>
+    </div>
+  </div>
+
+  <!-- Main App Screen -->
+  <div id="app-screen" class="min-h-screen flex flex-col hidden">
+    <header class="bg-red-600 border-b border-red-700 px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center sticky top-0 z-10">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <img src="icon-192.png" alt="NRD Costos" class="w-8 h-8 sm:w-10 sm:h-10 rounded">
+        <h1 class="text-lg sm:text-xl font-light tracking-tight text-white">NRD Costos</h1>
+      </div>
+      
+      <!-- Lado Derecho: Botonera -->
+      <div class="flex gap-2 items-center">
+        <!-- Botón Instalar (opcional, oculto por defecto) -->
+        <button id="install-btn" 
+          class="px-3 sm:px-4 py-1.5 sm:py-2 border border-white/30 hover:border-white text-white hover:bg-white/10 transition-colors uppercase tracking-wider text-xs font-light hidden">
+          Instalar
+        </button>
+        
+        <!-- Botón Perfil (siempre visible) -->
+        <button id="profile-btn" 
+          class="px-3 sm:px-4 py-1.5 sm:py-2 border border-white/30 hover:border-white text-white hover:bg-white/10 transition-colors uppercase tracking-wider text-xs font-light">
+          Perfil
+        </button>
+      </div>
+    </header>
+
+    <nav class="bg-white border-b border-gray-200 flex overflow-x-auto sticky top-[45px] sm:top-[53px] z-10 bg-white">
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-red-600 text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="dashboard">Inicio</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="recipes">Recetas</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="inputs">Insumos</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="labor-roles">Mano de Obra</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="indirect-costs">Costos Indirectos</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="products">Productos</button>
+      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="analysis">Análisis</button>
+    </nav>
+
+    <main class="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto max-w-6xl mx-auto w-full">
+      <!-- Dashboard View -->
+      <div id="dashboard-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div id="dashboard-content">
+          <p class="text-gray-500 text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
+
+      <!-- Recipes View -->
+      <div id="recipes-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-recipe-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nueva Receta
+            </button>
+          </div>
+        </div>
+        
+        <!-- Search Filter -->
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="recipes-search-input" 
+            placeholder="Buscar recetas por producto..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="recipes-list" class="space-y-2 sm:space-y-3"></div>
+
+        <!-- Recipe Detail View -->
+        <div id="recipe-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="recipe-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle de la Receta</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa de la receta</p>
+              </div>
+              <button id="back-to-recipes" 
+                class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <div id="recipe-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+            <button id="edit-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="close-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <!-- Recipe Form -->
+        <div id="recipe-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="recipe-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="recipe-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nueva Receta</h3>
+                <p id="recipe-form-subtitle" class="text-sm text-white/90 mt-1">Cree una nueva receta para un producto</p>
+              </div>
+              <button id="close-recipe-form" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <form id="recipe-form-element">
+            <input type="hidden" id="recipe-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Producto</label>
+              <div class="relative">
+                <input type="text" id="recipe-product-search" placeholder="Buscar producto..." 
+                  class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+                <input type="hidden" id="recipe-product" required>
+                <div id="recipe-product-search-results" 
+                  class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                </div>
+              </div>
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Rendimiento del Lote (unidades)</label>
+              <input type="number" id="recipe-batch-yield" step="0.01" min="0.01" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="Cantidad de unidades que rinde el lote">
+            </div>
+            
+            <!-- Inputs Section -->
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-2 text-xs uppercase tracking-wider text-gray-600">Insumos</label>
+              <div id="recipe-inputs-list" class="space-y-2 mb-3"></div>
+              <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 p-3 bg-gray-50 rounded border border-gray-200">
+                <input type="hidden" id="add-input-type" value="input">
+                <div class="relative flex-1">
+                  <input type="text" id="add-input-search" placeholder="Buscar insumo o producto..." 
+                    class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                  <input type="hidden" id="add-input-select">
+                  <div id="add-input-search-results" 
+                    class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  </div>
+                </div>
+                <input type="number" id="add-input-quantity" step="0.01" min="0" placeholder="Cantidad" 
+                  class="w-full sm:w-32 px-2 py-1 border border-gray-300 rounded text-sm">
+                <button type="button" id="add-input-btn" 
+                  class="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">
+                  Agregar
+                </button>
+              </div>
+            </div>
+            
+            <!-- Labor Section -->
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-2 text-xs uppercase tracking-wider text-gray-600">Mano de Obra</label>
+              <div id="recipe-labor-list" class="space-y-2 mb-3"></div>
+              <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 p-3 bg-gray-50 rounded border border-gray-200">
+                <div class="relative flex-1">
+                  <input type="text" id="add-labor-search" placeholder="Buscar rol de mano de obra..." 
+                    class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                  <input type="hidden" id="add-labor-select">
+                  <div id="add-labor-search-results" 
+                    class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  </div>
+                </div>
+                <input type="number" id="add-labor-hours" step="0.1" min="0" placeholder="Horas" 
+                  class="w-full sm:w-32 px-2 py-1 border border-gray-300 rounded text-sm">
+                <button type="button" id="add-labor-btn" 
+                  class="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">
+                  Agregar
+                </button>
+              </div>
+            </div>
+            
+            <!-- Calculations Display -->
+            <div class="mb-4 sm:mb-6 p-3 bg-blue-50 rounded border border-blue-200">
+              <label class="block mb-2 text-xs uppercase tracking-wider text-blue-800 font-medium">Cálculos en Tiempo Real</label>
+              <div id="recipe-calculations" class="text-sm text-gray-500">
+                <p>Complete el producto y el rendimiento para ver los cálculos</p>
+              </div>
+            </div>
+            
+            <div class="mb-4 sm:mb-6">
+              <label class="flex items-center">
+                <input type="checkbox" id="recipe-active" checked class="mr-2">
+                <span class="text-xs uppercase tracking-wider text-gray-600">Activa</span>
+              </label>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-recipe-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-recipe-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Inputs View -->
+      <div id="inputs-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-input-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nuevo Insumo
+            </button>
+          </div>
+        </div>
+        
+        <!-- Search Filter -->
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="inputs-search-input" 
+            placeholder="Buscar insumos por nombre, unidad, proveedor..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="inputs-list" class="space-y-2 sm:space-y-3"></div>
+
+        <!-- Input Detail View -->
+        <div id="input-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="input-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle del Insumo</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa del insumo</p>
+              </div>
+              <button id="back-to-inputs" 
+                class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <div id="input-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+            <button id="edit-input-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-input-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="close-input-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Form -->
+        <div id="input-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="input-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="input-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nuevo Insumo</h3>
+                <p id="input-form-subtitle" class="text-sm text-white/90 mt-1">Agregue un nuevo insumo</p>
+              </div>
+              <button id="close-input-form" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <form id="input-form-element">
+            <input type="hidden" id="input-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Nombre</label>
+              <input type="text" id="input-name" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Unidad</label>
+              <input type="text" id="input-unit" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="kg, litro, unidad, etc.">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Precio Unitario</label>
+              <input type="number" id="input-unit-price" step="0.01" min="0" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Proveedor</label>
+              <input type="text" id="input-supplier" 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-input-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-input-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Labor Roles View -->
+      <div id="labor-roles-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-labor-role-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nuevo Rol
+            </button>
+          </div>
+        </div>
+        
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="labor-roles-search-input" 
+            placeholder="Buscar roles por nombre..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="labor-roles-list" class="space-y-2 sm:space-y-3"></div>
+
+        <div id="labor-role-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="labor-role-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle del Rol</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa del rol</p>
+              </div>
+              <button id="back-to-labor-roles" 
+                class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <div id="labor-role-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+            <button id="edit-labor-role-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-labor-role-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="close-labor-role-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <div id="labor-role-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="labor-role-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="labor-role-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nuevo Rol</h3>
+                <p id="labor-role-form-subtitle" class="text-sm text-white/90 mt-1">Agregue un nuevo rol de mano de obra</p>
+              </div>
+              <button id="close-labor-role-form" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <form id="labor-role-form-element">
+            <input type="hidden" id="labor-role-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Nombre</label>
+              <input type="text" id="labor-role-name" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Costo Hora</label>
+              <input type="number" id="labor-role-hourly-cost" step="0.01" min="0" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-labor-role-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-labor-role-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Indirect Costs View -->
+      <div id="indirect-costs-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-indirect-cost-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nuevo Costo Indirecto
+            </button>
+          </div>
+        </div>
+        
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="indirect-costs-search-input" 
+            placeholder="Buscar costos indirectos..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="indirect-costs-list" class="space-y-2 sm:space-y-3"></div>
+
+        <div id="indirect-cost-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="indirect-cost-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle del Costo Indirecto</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa del costo indirecto</p>
+              </div>
+              <button id="back-to-indirect-costs" 
+                class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <div id="indirect-cost-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+            <button id="edit-indirect-cost-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-indirect-cost-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="close-indirect-cost-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <div id="indirect-cost-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="indirect-cost-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="indirect-cost-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nuevo Costo Indirecto</h3>
+                <p id="indirect-cost-form-subtitle" class="text-sm text-white/90 mt-1">Agregue un nuevo costo indirecto</p>
+              </div>
+              <button id="close-indirect-cost-form" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <form id="indirect-cost-form-element">
+            <input type="hidden" id="indirect-cost-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Nombre</label>
+              <input type="text" id="indirect-cost-name" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Monto Mensual</label>
+              <input type="number" id="indirect-cost-monthly-amount" step="0.01" min="0" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Método de Prorrateo</label>
+              <select id="indirect-cost-proration-method" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+                <option value="units">Por Unidades</option>
+                <option value="hours">Por Horas</option>
+              </select>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-indirect-cost-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-indirect-cost-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Products View -->
+      <div id="products-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-product-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nuevo Producto
+            </button>
+          </div>
+        </div>
+        
+        <!-- Search Filter -->
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="products-search-input" 
+            placeholder="Buscar productos por nombre, SKU, precio..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="products-list" class="space-y-2 sm:space-y-3"></div>
+
+        <!-- Product Detail View -->
+        <div id="product-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="product-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle del Producto</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa del producto</p>
+              </div>
+              <button id="back-to-products" 
+                class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <div id="product-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+            <button id="edit-product-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-product-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="close-product-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <!-- Product Form -->
+        <div id="product-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="product-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="product-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nuevo Producto</h3>
+                <p id="product-form-subtitle" class="text-sm text-white/90 mt-1">Agregue un nuevo producto al catálogo</p>
+              </div>
+              <button id="close-product-form" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+            </div>
+          </div>
+          <form id="product-form-element">
+            <input type="hidden" id="product-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Nombre</label>
+              <input type="text" id="product-name" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Código SKU</label>
+              <input type="text" id="product-sku" 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="Código de referencia interna">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Precio</label>
+              <input type="number" id="product-price" step="0.01" min="0" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Costo</label>
+              <input type="number" id="product-cost" step="0.01" min="0"
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Margen Objetivo (%)</label>
+              <input type="number" id="product-target-margin" step="0.1" min="0" max="99.9"
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="Porcentaje de margen objetivo (ej: 30)">
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="flex items-center">
+                <input type="checkbox" id="product-active" checked class="mr-2">
+                <span class="text-xs uppercase tracking-wider text-gray-600">Activo</span>
+              </label>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-product-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-product-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Analysis View -->
+      <div id="analysis-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="mb-3 sm:mb-4">
+          <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-2">Análisis de Productos</h2>
+          <p class="text-sm text-gray-600">Análisis en tiempo real de costos, márgenes y rentabilidad de productos con recetas activas</p>
+        </div>
+        <div id="analysis-table" class="border border-gray-200 p-4 sm:p-6">
+          <p class="text-gray-500 text-sm">Cargando análisis...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg sm:text-xl font-light tracking-tight">Perfil de Usuario</h3>
+        <button id="close-profile-modal" class="text-gray-400 hover:text-red-600 text-xl font-light">×</button>
+      </div>
+      <div id="profile-modal-content" class="p-4 sm:p-6 space-y-4">
+        <!-- User data will be inserted here -->
+      </div>
+      <div class="p-4 sm:p-6 border-t border-gray-200">
+        <button id="profile-logout-btn" 
+          class="w-full px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+          Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price Simulator Modal -->
+  <div id="price-simulator-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 bg-gray-600">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Simulador de Precios</h3>
+          <button id="simulator-close-btn" class="text-white hover:text-gray-200 text-2xl font-light w-8 h-8 flex items-center justify-center hover:bg-white/20 transition-colors">×</button>
+        </div>
+      </div>
+      <div class="p-4 sm:p-6 space-y-4">
+        <div>
+          <p class="text-sm text-gray-600 mb-2">Producto:</p>
+          <p id="simulator-product-name" class="text-base font-medium text-gray-800"></p>
+        </div>
+        <div class="flex justify-between py-2 border-b border-gray-200">
+          <span class="text-sm text-gray-600">Costo Total Unitario:</span>
+          <span id="simulator-total-cost" class="text-sm font-medium text-gray-800"></span>
+        </div>
+        <div class="flex justify-between py-2 border-b border-gray-200">
+          <span class="text-sm text-gray-600">Precio Actual:</span>
+          <span id="simulator-current-price" class="text-sm font-medium text-red-600"></span>
+        </div>
+        <div>
+          <label class="block mb-2 text-xs uppercase tracking-wider text-gray-600">Nuevo Precio</label>
+          <input type="number" id="simulator-new-price" step="0.01" min="0"
+            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base">
+        </div>
+        <div id="simulator-result" class="p-3 bg-gray-50 rounded border border-gray-200">
+          <p class="text-gray-500 text-sm">Ingrese un precio para ver los resultados</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Modal -->
+  <div id="custom-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6">
+        <h3 id="modal-title" class="text-lg sm:text-xl font-light mb-3 sm:mb-4 text-black"></h3>
+        <p id="modal-message" class="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6"></p>
+        <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <button id="modal-confirm" class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Confirmar
+          </button>
+          <button id="modal-cancel" class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert -->
+  <div id="custom-alert" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6">
+        <h3 id="alert-title" class="text-lg sm:text-xl font-light mb-3 sm:mb-4 text-black"></h3>
+        <p id="alert-message" class="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6"></p>
+        <div class="flex justify-end">
+          <button id="alert-ok" class="px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Aceptar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  
+  <!-- NRD Data Access Library -->
+  <script src="https://cdn.jsdelivr.net/gh/yosbany/nrd-data-access@main/dist/nrd-data-access.js"></script>
+  
+  <!-- Logger (must load before other app scripts) -->
+  <script src="logger.js"></script>
+  
+  <!-- Firebase Configuration and Initialization -->
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyD02egBPI7FnsliANDKa8noTkVmGMW0POg",
+      authDomain: "nrd-db.firebaseapp.com",
+      databaseURL: "https://nrd-db-default-rtdb.firebaseio.com",
+      projectId: "nrd-db",
+      storageBucket: "nrd-db.firebasestorage.app",
+      messagingSenderId: "544444461682",
+      appId: "1:544444461682:web:110c97ffffc984ddd208eb"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Initialize NRD Data Access Library (make it global)
+    window.nrd = new NRDDataAccess();
+    const nrd = window.nrd; // For backward compatibility in this scope
+  </script>
+  
+  <!-- App Scripts -->
+  <script src="modal.js?v=1768190760792"></script>
+  <script src="auth.js?v=1768190760792"></script>
+  <script src="tabs/calculations.js?v=1768190760792"></script>
+  <script src="tabs/inputs.js?v=1768190760792"></script>
+  <script src="tabs/labor-roles.js?v=1768190760792"></script>
+  <script src="tabs/indirect-costs.js?v=1768190760792"></script>
+  <script src="tabs/products.js?v=1768190760792"></script>
+  <script src="tabs/recipes.js?v=1768190760792"></script>
+  <script src="tabs/analysis.js?v=1768190760792"></script>
+  <script src="tabs/dashboard.js?v=1768190760792"></script>
+  <script src="app.js?v=1768190760792"></script>
+
+  <script>
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+      const appScreen = document.getElementById('app-screen');
+      if (appScreen && !appScreen.classList.contains('hidden')) {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'fixed top-20 left-0 right-0 bg-red-600 text-white p-4 z-50 text-center';
+        errorMsg.textContent = 'Error al cargar la aplicación. Por favor, recarga la página.';
+        document.body.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 5000);
+      }
+    });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js?v=1768190760792')
+          .then(reg => {
+            console.log('Service Worker registered');
+            reg.update();
+          })
+          .catch(err => {
+            console.log('Service Worker registration failed:', err);
+          });
+      });
+    }
+
+    // PWA Install prompt
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBtn) installBtn.classList.remove('hidden');
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+          await showInfo('Para instalar la app, usa el menú del navegador.');
+          return;
+        }
+        
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        if (installBtn) installBtn.classList.add('hidden');
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      if (installBtn) installBtn.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>
