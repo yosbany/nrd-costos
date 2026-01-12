@@ -1,5 +1,8 @@
 // Dashboard with monitoring and top impacts
 
+// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
+var nrd = window.nrd;
+
 let dashboardProductsListener = null;
 let dashboardRecipesListener = null;
 let dashboardInputsListener = null;
@@ -17,8 +20,8 @@ function escapeHtml(text) {
 // Load all data for dashboard
 async function loadDashboardData() {
   try {
-    // Use window.nrd if nrd is not defined in this scope
-    const nrdInstance = typeof nrd !== 'undefined' ? nrd : window.nrd;
+    // Use window.nrd (already set at the top of the file)
+    const nrdInstance = window.nrd || nrd;
     
     if (!nrdInstance) {
       logger.error('nrd instance not found');
@@ -395,8 +398,8 @@ let initializeDashboardRetryCount = 0;
 const MAX_RETRIES = 10; // Maximum 10 retries (3 seconds total)
 
 function initializeDashboard() {
-  // Use window.nrd if nrd is not defined in this scope
-  const nrdInstance = typeof nrd !== 'undefined' ? nrd : window.nrd;
+  // Use window.nrd (already set at the top of the file)
+  const nrdInstance = window.nrd || nrd;
   
   // Check if nrd instance exists
   if (!nrdInstance) {
