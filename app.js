@@ -17,7 +17,7 @@ function switchView(viewName) {
   currentView = viewName;
 
   // Hide all views
-  const views = ['dashboard', 'recipes', 'inputs', 'labor-roles', 'indirect-costs', 'products', 'analysis'];
+  const views = ['dashboard', 'recipes', 'inputs', 'labor-roles', 'indirect-costs', 'analysis'];
   views.forEach(view => {
     const viewElement = document.getElementById(`${view}-view`);
     if (viewElement) {
@@ -66,12 +66,6 @@ function switchView(viewName) {
       initializeIndirectCosts();
     } else if (typeof loadIndirectCosts === 'function') {
       loadIndirectCosts();
-    }
-  } else if (viewName === 'products') {
-    if (typeof initializeProducts === 'function') {
-      initializeProducts();
-    } else if (typeof loadProducts === 'function') {
-      loadProducts();
     }
   } else if (viewName === 'recipes') {
     if (typeof initializeRecipes === 'function') {
