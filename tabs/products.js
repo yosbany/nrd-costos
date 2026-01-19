@@ -14,6 +14,42 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Helper functions for product variants
+/**
+ * Genera el SKU completo de una variante
+ * @param {string} parentSku - SKU del producto padre
+ * @param {string} variantSuffix - Sufijo de la variante
+ * @returns {string} SKU completo en formato <SKU Padre>_<SKUVariante>
+ */
+function getVariantSku(parentSku, variantSuffix) {
+  if (!parentSku || !variantSuffix) return '';
+  return `${parentSku}_${variantSuffix}`;
+}
+
+/**
+ * Obtiene el SKU completo de una variante desde un producto
+ * @param {Product} product - Producto con variantes
+ * @param {string} variantId - ID de la variante
+ * @returns {string} SKU completo o string vacío
+ */
+function getVariantSkuFromProduct(product, variantId) {
+  if (!product || !product.variants || !variantId) return '';
+  const variant = product.variants.find(v => v.id === variantId);
+  if (!variant || !variant.skuSuffix || !product.sku) return '';
+  return getVariantSku(product.sku, variant.skuSuffix);
+}
+
+/**
+ * Obtiene una variante específica de un producto
+ * @param {Product} product - Producto
+ * @param {string} variantId - ID de la variante
+ * @returns {ProductVariant|null}
+ */
+function getVariantById(product, variantId) {
+  if (!product || !product.variants || !variantId) return null;
+  return product.variants.find(v => v.id === variantId) || null;
+}
+
 // Load products
 function loadProducts() {
   const productsList = document.getElementById('products-list');
@@ -71,16 +107,25 @@ function loadProducts() {
       const item = document.createElement('div');
       item.className = 'border border-gray-200 p-3 sm:p-4 md:p-6 hover:border-red-600 transition-colors cursor-pointer';
       item.dataset.productId = id;
+      const hasVariants = product.variants && product.variants.length > 0;
+      const activeVariants = hasVariants ? product.variants.filter(v => v.active !== false).length : 0;
       item.innerHTML = `
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
-          <div class="text-base sm:text-lg font-light flex-1">${escapeHtml(product.name)}</div>
+          <div class="text-base sm:text-lg font-light flex-1">
+            ${escapeHtml(product.name)}
+            ${hasVariants ? `<span class="ml-2 text-xs text-gray-500">(${activeVariants} variante${activeVariants !== 1 ? 's' : ''})</span>` : ''}
+          </div>
           <span class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs uppercase tracking-wider border ${product.active ? 'border-red-600 text-red-600' : 'border-gray-300 text-gray-600'}">
             ${product.active ? 'Activo' : 'Inactivo'}
           </span>
         </div>
         <div class="text-xs sm:text-sm text-gray-600">
           ${product.sku ? `<div class="mb-1">SKU: <span class="font-mono">${escapeHtml(product.sku)}</span></div>` : ''}
+          ${hasVariants ? `
+          <div class="mb-1 text-gray-500 italic">Producto con variantes (precio base: $${parseFloat(product.price || 0).toFixed(2)})</div>
+          ` : `
           <div class="mb-1">Precio: <span class="text-red-600 font-medium">$${parseFloat(product.price || 0).toFixed(2)}</span></div>
+          `}
           ${product.cost !== undefined ? `<div class="mb-1">Costo: <span class="text-gray-700 font-medium">$${parseFloat(product.cost || 0).toFixed(2)}</span></div>` : ''}
           ${product.targetMargin !== undefined ? `<div class="mb-1">Margen Objetivo: <span class="text-blue-600 font-medium">${parseFloat(product.targetMargin || 0).toFixed(1)}%</span></div>` : ''}
         </div>
@@ -108,6 +153,10 @@ function showProductForm(productId = null) {
   
   const formElement = document.getElementById('product-form-element');
   if (formElement) formElement.reset();
+  
+  // Clear variants list
+  const variantsList = document.getElementById('product-variants-list');
+  if (variantsList) variantsList.innerHTML = '';
   
   const idInput = document.getElementById('product-id');
   if (idInput) idInput.value = productId || '';
@@ -141,6 +190,17 @@ function showProductForm(productId = null) {
         if (costInput) costInput.value = product.cost || '';
         if (targetMarginInput) targetMarginInput.value = product.targetMargin || '';
         if (activeInput) activeInput.checked = product.active !== false;
+        
+        // Load variants
+        const variantsList = document.getElementById('product-variants-list');
+        if (variantsList) {
+          variantsList.innerHTML = '';
+          if (product.variants && Array.isArray(product.variants)) {
+            product.variants.forEach(variant => {
+              addVariantRow(variant);
+            });
+          }
+        }
       }
     })();
   } else {
@@ -249,6 +309,33 @@ async function viewProduct(productId) {
           </div>
           `;
           })() : ''}
+          ${product.variants && product.variants.length > 0 ? `
+          <div class="py-2 sm:py-3 border-b border-gray-200">
+            <div class="text-gray-600 font-light text-sm sm:text-base mb-2">Variantes:</div>
+            <div class="space-y-2">
+              ${product.variants.map(variant => {
+                const fullSku = variant.skuSuffix && product.sku ? getVariantSku(product.sku, variant.skuSuffix) : '';
+                return `
+                <div class="bg-gray-50 p-2 sm:p-3 rounded border border-gray-200">
+                  <div class="flex justify-between items-start mb-1">
+                    <span class="font-medium text-sm">${escapeHtml(variant.name)}</span>
+                    <span class="px-2 py-0.5 text-xs uppercase tracking-wider border ${variant.active !== false ? 'border-red-600 text-red-600' : 'border-gray-300 text-gray-600'}">
+                      ${variant.active !== false ? 'Activa' : 'Inactiva'}
+                    </span>
+                  </div>
+                  ${fullSku ? `
+                  <div class="text-xs text-gray-600 mb-1">SKU: <span class="font-mono">${escapeHtml(fullSku)}</span></div>
+                  ` : ''}
+                  <div class="text-xs text-gray-600">Precio: <span class="text-red-600 font-medium">$${parseFloat(variant.price || 0).toFixed(2)}</span></div>
+                  ${variant.cost !== undefined ? `
+                  <div class="text-xs text-gray-600">Costo: <span class="text-gray-700 font-medium">$${parseFloat(variant.cost || 0).toFixed(2)}</span></div>
+                  ` : ''}
+                </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          ` : ''}
           <div class="flex justify-between py-2 sm:py-3 border-b border-gray-200">
             <span class="text-gray-600 font-light text-sm sm:text-base">Estado:</span>
             <span class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs uppercase tracking-wider border ${product.active ? 'border-red-600 text-red-600' : 'border-gray-300 text-gray-600'}">
@@ -311,6 +398,171 @@ async function deleteProductHandler(productId) {
   }
 }
 
+// Variants management
+function addVariantRow(variant = null) {
+  const variantsList = document.getElementById('product-variants-list');
+  if (!variantsList) return;
+  
+  const variantId = variant ? variant.id : Date.now().toString();
+  const row = document.createElement('div');
+  row.className = 'border border-gray-200 rounded p-3 sm:p-4 bg-gray-50';
+  row.dataset.variantId = variantId;
+  
+  row.innerHTML = `
+    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-3 items-end">
+      <div class="sm:col-span-3">
+        <label class="block text-xs text-gray-600 mb-1">Nombre</label>
+        <input type="text" class="variant-name w-full px-2 py-1.5 border border-gray-300 rounded text-sm" 
+          value="${variant ? escapeHtml(variant.name) : ''}" 
+          placeholder="Ej: Pequeña, Grande, Chocolate" required>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-600 mb-1">Sufijo SKU</label>
+        <input type="text" class="variant-sku-suffix w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono" 
+          value="${variant ? escapeHtml(variant.skuSuffix || '') : ''}" 
+          placeholder="PEQ, GRD, etc.">
+        <div class="text-xs text-gray-500 mt-1 variant-sku-preview"></div>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-600 mb-1">Precio</label>
+        <input type="number" class="variant-price w-full px-2 py-1.5 border border-gray-300 rounded text-sm" 
+          step="0.01" min="0" value="${variant ? parseFloat(variant.price || 0).toFixed(2) : ''}" required>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-600 mb-1">Costo</label>
+        <input type="number" class="variant-cost w-full px-2 py-1.5 border border-gray-300 rounded text-sm" 
+          step="0.01" min="0" value="${variant ? (variant.cost !== undefined ? parseFloat(variant.cost).toFixed(2) : '') : ''}">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="flex items-center">
+          <input type="checkbox" class="variant-active mr-2" ${variant ? (variant.active !== false ? 'checked' : '') : 'checked'}>
+          <span class="text-xs text-gray-600">Activa</span>
+        </label>
+      </div>
+      <div class="sm:col-span-1">
+        <button type="button" class="remove-variant-btn w-full px-2 py-1.5 text-red-600 hover:bg-red-50 border border-red-600 rounded text-sm transition-colors">
+          ×
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Update SKU preview when SKU suffix or parent SKU changes
+  const updateSkuPreview = () => {
+    const parentSku = document.getElementById('product-sku')?.value.trim();
+    const suffix = row.querySelector('.variant-sku-suffix')?.value.trim();
+    const preview = row.querySelector('.variant-sku-preview');
+    if (preview) {
+      if (parentSku && suffix) {
+        preview.textContent = `SKU: ${getVariantSku(parentSku, suffix)}`;
+        preview.classList.remove('hidden');
+      } else {
+        preview.textContent = '';
+        preview.classList.add('hidden');
+      }
+    }
+  };
+  
+  // Listen to SKU suffix changes
+  const skuSuffixInput = row.querySelector('.variant-sku-suffix');
+  if (skuSuffixInput) {
+    skuSuffixInput.addEventListener('input', updateSkuPreview);
+  }
+  
+  // Listen to parent SKU changes
+  const parentSkuInput = document.getElementById('product-sku');
+  if (parentSkuInput) {
+    parentSkuInput.addEventListener('input', updateSkuPreview);
+  }
+  
+  // Initial preview update
+  updateSkuPreview();
+  
+  // Remove button handler
+  const removeBtn = row.querySelector('.remove-variant-btn');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+    });
+  }
+  
+  variantsList.appendChild(row);
+}
+
+function collectVariants() {
+  const variantsList = document.getElementById('product-variants-list');
+  if (!variantsList) return [];
+  
+  const variants = [];
+  const rows = variantsList.querySelectorAll('[data-variant-id]');
+  
+  rows.forEach(row => {
+    const variantId = row.dataset.variantId;
+    const name = row.querySelector('.variant-name')?.value.trim();
+    const skuSuffix = row.querySelector('.variant-sku-suffix')?.value.trim();
+    const priceValue = row.querySelector('.variant-price')?.value.trim();
+    const costValue = row.querySelector('.variant-cost')?.value.trim();
+    const active = row.querySelector('.variant-active')?.checked;
+    
+    if (!name) return; // Skip incomplete variants
+    
+    const price = parseFloat(priceValue);
+    if (isNaN(price) || price < 0) return; // Skip invalid prices
+    
+    const variant = {
+      id: variantId,
+      name,
+      price,
+      active: active !== false
+    };
+    
+    if (skuSuffix) {
+      variant.skuSuffix = skuSuffix;
+    }
+    
+    if (costValue) {
+      const cost = parseFloat(costValue);
+      if (!isNaN(cost) && cost >= 0) {
+        variant.cost = cost;
+      }
+    }
+    
+    variants.push(variant);
+  });
+  
+  return variants;
+}
+
+function validateVariants(variants, parentSku) {
+  if (variants.length === 0) return null;
+  
+  // Check unique names
+  const names = variants.map(v => v.name.toLowerCase());
+  if (new Set(names).size !== names.length) {
+    return 'Las variantes deben tener nombres únicos';
+  }
+  
+  // Check unique SKU suffixes
+  const suffixes = variants
+    .filter(v => v.skuSuffix)
+    .map(v => v.skuSuffix.toUpperCase());
+  if (new Set(suffixes).size !== suffixes.length) {
+    return 'Los sufijos de SKU deben ser únicos';
+  }
+  
+  // Check unique full SKUs if parent SKU exists
+  if (parentSku) {
+    const fullSkus = variants
+      .filter(v => v.skuSuffix)
+      .map(v => getVariantSku(parentSku, v.skuSuffix));
+    if (new Set(fullSkus).size !== fullSkus.length) {
+      return 'Los SKUs completos de las variantes deben ser únicos';
+    }
+  }
+  
+  return null;
+}
+
 // Product form submit handler
 let productFormHandlerSetup = false;
 function setupProductFormHandler() {
@@ -319,6 +571,15 @@ function setupProductFormHandler() {
   if (!formElement) return;
   
   productFormHandlerSetup = true;
+  
+  // Add variant button handler
+  const addVariantBtn = document.getElementById('add-variant-btn');
+  if (addVariantBtn) {
+    addVariantBtn.addEventListener('click', () => {
+      addVariantRow();
+    });
+  }
+  
   formElement.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -347,6 +608,14 @@ function setupProductFormHandler() {
       return;
     }
 
+    // Collect and validate variants
+    const variants = collectVariants();
+    const variantError = validateVariants(variants, sku);
+    if (variantError) {
+      await showError(variantError);
+      return;
+    }
+
     try {
       const productData = { name, price, active };
       if (sku) {
@@ -357,6 +626,9 @@ function setupProductFormHandler() {
       }
       if (targetMargin !== undefined) {
         productData.targetMargin = targetMargin;
+      }
+      if (variants.length > 0) {
+        productData.variants = variants;
       }
       await saveProduct(productId || null, productData);
       hideProductForm();

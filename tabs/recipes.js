@@ -141,6 +141,15 @@ function loadRecipes() {
       const product = productsData[recipe.productId];
       if (!product) continue;
 
+      // Get variant info
+      let variantName = '';
+      if (recipe.variantId && product.variants) {
+        const variant = product.variants.find(v => v.id === recipe.variantId);
+        if (variant) {
+          variantName = ` - ${variant.name}`;
+        }
+      }
+
       const directCost = await calculateDirectCost(recipe, inputsData, productsData, laborRolesData);
       const directUnitCost = calculateDirectUnitCost(directCost, recipe.batchYield || 1);
       
@@ -149,7 +158,7 @@ function loadRecipes() {
       item.dataset.recipeId = id;
       item.innerHTML = `
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
-          <div class="text-base sm:text-lg font-light flex-1">${escapeHtml(product.name)}</div>
+          <div class="text-base sm:text-lg font-light flex-1">${escapeHtml(product.name)}${variantName ? `<span class="text-gray-500 text-sm">${escapeHtml(variantName)}</span>` : ''}</div>
           <span class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs uppercase tracking-wider border ${recipe.active ? 'border-red-600 text-red-600' : 'border-gray-300 text-gray-600'}">
             ${recipe.active ? 'Activa' : 'Inactiva'}
           </span>
@@ -158,12 +167,29 @@ function loadRecipes() {
           <div>Rendimiento: <span class="font-medium">${parseFloat(recipe.batchYield || 0).toFixed(2)} unidades</span></div>
           <div>Costo Directo Lote: <span class="text-gray-700 font-medium">$${directCost.toFixed(2)}</span></div>
           <div>Costo Directo Unitario: <span class="text-gray-700 font-medium">$${directUnitCost.toFixed(2)}</span></div>
-          ${product.price ? `
-          <div>Precio Venta: <span class="text-red-600 font-medium">$${parseFloat(product.price).toFixed(2)}</span></div>
-          ${product.price && directUnitCost > 0 ? `
-          <div>Margen: <span class="${((product.price - directUnitCost) / product.price * 100) < 0 ? 'text-red-600' : 'text-green-600'} font-medium">${((product.price - directUnitCost) / product.price * 100).toFixed(1)}%</span></div>
+          ${(() => {
+            // Get price from variant if exists, otherwise from product
+            let displayPrice = product.price || 0;
+            if (recipe.variantId && product.variants) {
+              const variant = product.variants.find(v => v.id === recipe.variantId);
+              if (variant) {
+                displayPrice = variant.price || 0;
+              }
+            }
+            
+            if (displayPrice > 0) {
+              const margin = displayPrice > 0 && directUnitCost > 0 
+                ? ((displayPrice - directUnitCost) / displayPrice * 100) 
+                : 0;
+              return `
+          <div>Precio Venta: <span class="text-red-600 font-medium">$${parseFloat(displayPrice).toFixed(2)}</span></div>
+          ${margin !== 0 ? `
+          <div>Margen: <span class="${margin < 0 ? 'text-red-600' : 'text-green-600'} font-medium">${margin.toFixed(1)}%</span></div>
           ` : ''}
-          ` : ''}
+          `;
+            }
+            return '';
+          })()}
           <div class="text-xs text-gray-500 mt-2">
             ${recipe.inputs ? `${recipe.inputs.length} insumo(s)` : '0 insumos'} | 
             ${recipe.labor ? `${recipe.labor.length} rol(es) de mano de obra` : '0 roles'}
@@ -234,6 +260,16 @@ function showRecipeForm(recipeId = null) {
             productSearchInput.value = product.name || '';
           }
         }
+        
+        // Load variant
+        const variantSelect = document.getElementById('recipe-variant');
+        if (variantSelect && recipe.variantId) {
+          updateRecipeVariantSelector(productId);
+          variantSelect.value = recipe.variantId;
+        } else {
+          updateRecipeVariantSelector(productId);
+        }
+        
         if (batchYieldInput) batchYieldInput.value = recipe.batchYield || '';
         if (activeInput) activeInput.checked = recipe.active !== false;
         
@@ -343,7 +379,44 @@ function selectRecipeProduct(item, searchInput, resultsDiv, hiddenInput) {
   if (resultsDiv) resultsDiv.classList.add('hidden');
   
   selectedRecipeProductIndex = -1;
+  
+  // Update variant selector
+  updateRecipeVariantSelector(productId);
+  
   updateRecipeCalculations();
+}
+
+// Update variant selector based on selected product
+function updateRecipeVariantSelector(productId) {
+  const variantContainer = document.getElementById('recipe-variant-container');
+  const variantSelect = document.getElementById('recipe-variant');
+  
+  if (!variantContainer || !variantSelect) return;
+  
+  const product = productsData[productId];
+  if (!product || !product.variants || product.variants.length === 0) {
+    // Product has no variants, hide selector
+    variantContainer.classList.add('hidden');
+    variantSelect.value = '';
+    variantSelect.required = false;
+    return;
+  }
+  
+  // Product has variants, show selector
+  variantContainer.classList.remove('hidden');
+  variantSelect.required = true;
+  
+  // Clear and populate options
+  variantSelect.innerHTML = '<option value="">Seleccione una variante...</option>';
+  
+  product.variants.forEach(variant => {
+    if (variant.active !== false) {
+      const option = document.createElement('option');
+      option.value = variant.id;
+      option.textContent = `${variant.name} - $${parseFloat(variant.price || 0).toFixed(2)}`;
+      variantSelect.appendChild(option);
+    }
+  });
 }
 
 // Setup recipe product search
@@ -1087,12 +1160,34 @@ async function viewRecipe(recipeId) {
         laborHtml += '</div>';
       }
 
+      // Get variant info if exists
+      let variantInfo = '';
+      if (recipe.variantId && product.variants) {
+        const variant = product.variants.find(v => v.id === recipe.variantId);
+        if (variant) {
+          const fullSku = variant.skuSuffix && product.sku ? `${product.sku}_${variant.skuSuffix}` : '';
+          variantInfo = `
+          <div class="flex justify-between py-2 sm:py-3 border-b border-gray-200">
+            <span class="text-gray-600 font-light text-sm sm:text-base">Variante:</span>
+            <span class="font-light text-sm sm:text-base">${escapeHtml(variant.name)} - $${parseFloat(variant.price || 0).toFixed(2)}</span>
+          </div>
+          ${fullSku ? `
+          <div class="flex justify-between py-2 sm:py-3 border-b border-gray-200">
+            <span class="text-gray-600 font-light text-sm sm:text-base">SKU Variante:</span>
+            <span class="font-light text-sm sm:text-base font-mono">${escapeHtml(fullSku)}</span>
+          </div>
+          ` : ''}
+          `;
+        }
+      }
+      
       detailContent.innerHTML = `
         <div class="space-y-4">
           <div class="flex justify-between py-2 sm:py-3 border-b border-gray-200">
             <span class="text-gray-600 font-light text-sm sm:text-base">Producto:</span>
             <span class="font-light text-sm sm:text-base">${escapeHtml(product.name)}</span>
           </div>
+          ${variantInfo}
           <div class="flex justify-between py-2 sm:py-3 border-b border-gray-200">
             <span class="text-gray-600 font-light text-sm sm:text-base">Rendimiento del Lote:</span>
             <span class="font-light text-sm sm:text-base">${parseFloat(recipe.batchYield || 0).toFixed(2)} unidades</span>
@@ -1199,12 +1294,27 @@ function setupRecipeFormHandler() {
     
     const recipeId = document.getElementById('recipe-id')?.value;
     const productId = document.getElementById('recipe-product')?.value;
+    const variantId = document.getElementById('recipe-variant')?.value || null;
     const batchYield = parseFloat(document.getElementById('recipe-batch-yield')?.value);
     const active = document.getElementById('recipe-active')?.checked;
 
     if (!productId) {
       await showError('Por favor seleccione un producto');
       return;
+    }
+
+    // Validate variant selection
+    const product = productsData[productId];
+    if (product && product.variants && product.variants.length > 0) {
+      if (!variantId) {
+        await showError('Este producto tiene variantes. Debe seleccionar una variante para la receta.');
+        return;
+      }
+    } else {
+      if (variantId) {
+        await showError('Este producto no tiene variantes.');
+        return;
+      }
     }
 
     if (isNaN(batchYield) || batchYield <= 0) {
@@ -1243,6 +1353,10 @@ function setupRecipeFormHandler() {
         labor, 
         active 
       };
+      
+      if (variantId) {
+        recipeData.variantId = variantId;
+      }
       
       if (!recipeId) {
         recipeData.createdAt = Date.now();

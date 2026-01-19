@@ -100,20 +100,45 @@ async function loadAnalysisData() {
 }
 
 // Calculate product analysis
-async function calculateProductAnalysis(productId, analysisData) {
+async function calculateProductAnalysis(productId, analysisData, variantId = null) {
   const product = analysisData.productsData[productId];
   if (!product) return null;
 
-  // Find active recipe for this product
+  // If product has variants, we need variantId
+  if (product.variants && product.variants.length > 0) {
+    if (!variantId) {
+      // Return analysis for all variants
+      const variantAnalyses = [];
+      for (const variant of product.variants) {
+        if (variant.active !== false) {
+          const analysis = await calculateProductAnalysis(productId, analysisData, variant.id);
+          if (analysis) {
+            variantAnalyses.push(analysis);
+          }
+        }
+      }
+      return {
+        product,
+        hasVariants: true,
+        variants: variantAnalyses
+      };
+    }
+  }
+
+  // Find active recipe for this product (and variant if specified)
   const activeRecipe = Object.values(analysisData.recipesData).find(
-    r => r.productId === productId && r.active !== false
+    r => r.productId === productId 
+      && r.active !== false
+      && (variantId ? r.variantId === variantId : !r.variantId)
   );
 
   if (!activeRecipe) {
     return {
       product,
+      variantId,
+      variant: variantId && product.variants ? product.variants.find(v => v.id === variantId) : null,
       hasRecipe: false,
-      message: 'Sin receta definida'
+      message: variantId ? 'Sin receta definida para esta variante' : 'Sin receta definida'
     };
   }
 
@@ -137,12 +162,15 @@ async function calculateProductAnalysis(productId, analysisData) {
   // Calculate total unit cost
   const totalUnitCost = calculateTotalUnitCost(directUnitCost, indirectUnitCost);
 
-  // Calculate suggested price
-  const targetMargin = product.targetMargin || 0;
+  // Get variant info if exists
+  const variant = variantId && product.variants ? product.variants.find(v => v.id === variantId) : null;
+  
+  // Calculate suggested price (use variant targetMargin if exists, otherwise product targetMargin)
+  const targetMargin = variant?.targetMargin !== undefined ? variant.targetMargin : (product.targetMargin || 0);
   const suggestedPrice = calculateSuggestedPrice(totalUnitCost, targetMargin);
 
-  // Calculate real margin
-  const currentPrice = product.price || 0;
+  // Calculate real margin (use variant price if exists, otherwise product price)
+  const currentPrice = variant ? (variant.price || 0) : (product.price || 0);
   const realMargin = currentPrice > 0 
     ? calculateRealMargin(currentPrice, totalUnitCost) 
     : 0;
@@ -152,6 +180,8 @@ async function calculateProductAnalysis(productId, analysisData) {
 
   return {
     product,
+    variantId,
+    variant,
     activeRecipe,
     hasRecipe: true,
     directCost,
@@ -190,7 +220,13 @@ async function renderAnalysisTable() {
   for (const product of activeProducts) {
     const analysis = await calculateProductAnalysis(product.id, analysisData);
     if (analysis) {
-      analyses.push(analysis);
+      if (analysis.hasVariants && analysis.variants) {
+        // Product has variants, add each variant analysis
+        analyses.push(...analysis.variants);
+      } else {
+        // Regular product or variant analysis
+        analyses.push(analysis);
+      }
     }
   }
 
@@ -213,9 +249,12 @@ async function renderAnalysisTable() {
 
   analyses.forEach(analysis => {
     if (!analysis.hasRecipe) {
+      const displayName = analysis.variant 
+        ? `${analysis.product.name} - ${analysis.variant.name}`
+        : analysis.product.name;
       cardsHtml += `
         <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
-          <h3 class="text-sm sm:text-base font-medium text-gray-800 mb-2">${escapeHtml(analysis.product.name)}</h3>
+          <h3 class="text-sm sm:text-base font-medium text-gray-800 mb-2">${escapeHtml(displayName)}</h3>
           <p class="text-xs sm:text-sm text-gray-500 mb-3">${escapeHtml(analysis.message)}</p>
           <button class="w-full px-3 py-2 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors" disabled>
             Simular
@@ -224,6 +263,15 @@ async function renderAnalysisTable() {
       `;
       return;
     }
+    
+    const displayName = analysis.variant 
+      ? `${analysis.product.name} - ${analysis.variant.name}`
+      : analysis.product.name;
+    
+    // Get variant SKU if exists
+    const variantSku = analysis.variant && analysis.variant.skuSuffix && analysis.product.sku
+      ? `${analysis.product.sku}_${analysis.variant.skuSuffix}`
+      : null;
 
     const statusColor = analysis.profitabilityStatus === 'loss' 
       ? 'text-red-600' 
@@ -250,9 +298,12 @@ async function renderAnalysisTable() {
       : 'Rentable';
 
     cardsHtml += `
-      <div class="bg-white border ${statusBorder} rounded p-3 sm:p-4 shadow-sm" data-product-id="${analysis.product.id}">
+      <div class="bg-white border ${statusBorder} rounded p-3 sm:p-4 shadow-sm" data-product-id="${analysis.product.id}" ${analysis.variantId ? `data-variant-id="${analysis.variantId}"` : ''}>
         <div class="flex items-start justify-between mb-3">
-          <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">${escapeHtml(analysis.product.name)}</h3>
+          <div class="flex-1">
+            <h3 class="text-sm sm:text-base font-medium text-gray-800">${escapeHtml(displayName)}</h3>
+            ${variantSku ? `<p class="text-xs text-gray-500 mt-1 font-mono">SKU: ${escapeHtml(variantSku)}</p>` : ''}
+          </div>
           <span class="px-2 py-1 text-xs rounded ${statusBg} ml-2 whitespace-nowrap">${statusLabel}</span>
         </div>
         <div class="space-y-2 text-xs sm:text-sm mb-4">
@@ -283,6 +334,7 @@ async function renderAnalysisTable() {
         </div>
         <button class="simulate-price-btn w-full px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors" 
           data-product-id="${analysis.product.id}"
+          ${analysis.variantId ? `data-variant-id="${analysis.variantId}"` : ''}
           data-total-cost="${analysis.totalUnitCost}"
           data-current-price="${analysis.currentPrice}">
           Simular Precio
@@ -301,17 +353,21 @@ async function renderAnalysisTable() {
   document.querySelectorAll('.simulate-price-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const productId = e.target.dataset.productId;
+      const variantId = e.target.dataset.variantId || null;
       const totalCost = parseFloat(e.target.dataset.totalCost);
       const currentPrice = parseFloat(e.target.dataset.currentPrice);
-      showPriceSimulator(productId, totalCost, currentPrice);
+      showPriceSimulator(productId, totalCost, currentPrice, variantId);
     });
   });
 }
 
 // Show price simulator modal
-async function showPriceSimulator(productId, totalCost, currentPrice) {
+async function showPriceSimulator(productId, totalCost, currentPrice, variantId = null) {
   const product = analysisProductsData[productId];
   if (!product) return;
+  
+  const variant = variantId && product.variants ? product.variants.find(v => v.id === variantId) : null;
+  const displayName = variant ? `${product.name} - ${variant.name}` : product.name;
 
   const simulatorModal = document.getElementById('price-simulator-modal');
   const simulatorProductName = document.getElementById('simulator-product-name');
@@ -322,13 +378,16 @@ async function showPriceSimulator(productId, totalCost, currentPrice) {
 
   if (!simulatorModal || !simulatorProductName || !simulatorNewPrice || !simulatorResult) return;
 
-  simulatorProductName.textContent = product.name || 'Producto';
+  simulatorProductName.textContent = displayName || 'Producto';
   if (simulatorTotalCost) simulatorTotalCost.textContent = `$${totalCost.toFixed(2)}`;
   if (simulatorCurrentPrice) simulatorCurrentPrice.textContent = `$${currentPrice.toFixed(2)}`;
   
   simulatorNewPrice.value = currentPrice.toFixed(2);
   simulatorNewPrice.dataset.totalCost = totalCost.toString();
   simulatorNewPrice.dataset.currentPrice = currentPrice.toString();
+  
+  // Use variant targetMargin if exists
+  const targetMargin = variant?.targetMargin !== undefined ? variant.targetMargin : (product.targetMargin || 0);
 
   // Update result on input change
   const updateSimulation = () => {
@@ -346,7 +405,7 @@ async function showPriceSimulator(productId, totalCost, currentPrice) {
 
     const marginColor = newMargin < 0 
       ? 'text-red-600' 
-      : newMargin < (product.targetMargin || 0) 
+      : newMargin < targetMargin 
       ? 'text-orange-600' 
       : 'text-green-600';
 
@@ -368,15 +427,15 @@ async function showPriceSimulator(productId, totalCost, currentPrice) {
             ${priceDiff >= 0 ? '+' : ''}$${Math.abs(priceDiff).toFixed(2)}
           </span>
         </div>
-        ${product.targetMargin ? `
+        ${targetMargin > 0 ? `
         <div class="flex justify-between py-1 border-b border-gray-200">
           <span class="text-gray-600">Margen Objetivo:</span>
-          <span class="font-medium">${product.targetMargin.toFixed(1)}%</span>
+          <span class="font-medium">${targetMargin.toFixed(1)}%</span>
         </div>
         <div class="flex justify-between py-1">
           <span class="text-gray-600">Estado:</span>
-          <span class="font-medium ${newMargin < 0 ? 'text-red-600' : newMargin < product.targetMargin ? 'text-orange-600' : 'text-green-600'}">
-            ${newMargin < 0 ? 'Pérdida' : newMargin < product.targetMargin ? 'Margen Bajo' : 'Rentable'}
+          <span class="font-medium ${newMargin < 0 ? 'text-red-600' : newMargin < targetMargin ? 'text-orange-600' : 'text-green-600'}">
+            ${newMargin < 0 ? 'Pérdida' : newMargin < targetMargin ? 'Margen Bajo' : 'Rentable'}
           </span>
         </div>
         ` : ''}

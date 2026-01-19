@@ -7,7 +7,7 @@
   <title>NRD Costos</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="styles.css?v=1768256017878">
+  <link rel="stylesheet" href="styles.css?v=1768569614262">
   <meta name="theme-color" content="#dc2626">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -193,6 +193,14 @@
                   class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                 </div>
               </div>
+            </div>
+            <div class="mb-4 sm:mb-6 hidden" id="recipe-variant-container">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Variante</label>
+              <select id="recipe-variant" 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+                <option value="">Seleccione una variante...</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">Este producto tiene variantes. Debe seleccionar una variante para la receta.</p>
             </div>
             <div class="mb-4 sm:mb-6">
               <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Rendimiento del Lote (unidades)</label>
@@ -640,6 +648,22 @@
                 <span class="text-xs uppercase tracking-wider text-gray-600">Activo</span>
               </label>
             </div>
+            
+            <!-- Variantes Section -->
+            <div class="mb-4 sm:mb-6 pt-4 sm:pt-6 border-t border-gray-200">
+              <div class="flex items-center justify-between mb-3">
+                <label class="text-xs uppercase tracking-wider text-gray-600">Variantes del Producto</label>
+                <button type="button" id="add-variant-btn" 
+                  class="px-3 py-1.5 text-xs bg-gray-200 text-gray-700 border border-gray-300 rounded hover:bg-gray-300 transition-colors uppercase tracking-wider font-light">
+                  + Agregar Variante
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-3">Las variantes permiten manejar diferentes tamaños, sabores, colores, etc. del mismo producto base.</p>
+              <div id="product-variants-list" class="space-y-2">
+                <!-- Las variantes se agregarán dinámicamente aquí -->
+              </div>
+            </div>
+            
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
               <button type="submit" id="save-product-btn"
                 class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
@@ -787,17 +811,17 @@
   </script>
   
   <!-- App Scripts -->
-  <script src="modal.js?v=1768256017878"></script>
-  <script src="auth.js?v=1768256017878"></script>
-  <script src="tabs/calculations.js?v=1768256017878"></script>
-  <script src="tabs/inputs.js?v=1768256017878"></script>
-  <script src="tabs/labor-roles.js?v=1768256017878"></script>
-  <script src="tabs/indirect-costs.js?v=1768256017878"></script>
-  <script src="tabs/products.js?v=1768256017878"></script>
-  <script src="tabs/recipes.js?v=1768256017878"></script>
-  <script src="tabs/analysis.js?v=1768256017878"></script>
-  <script src="tabs/dashboard.js?v=1768256017878"></script>
-  <script src="app.js?v=1768256017878"></script>
+  <script src="modal.js?v=1768569614262"></script>
+  <script src="auth.js?v=1768569614262"></script>
+  <script src="tabs/calculations.js?v=1768569614262"></script>
+  <script src="tabs/inputs.js?v=1768569614262"></script>
+  <script src="tabs/labor-roles.js?v=1768569614262"></script>
+  <script src="tabs/indirect-costs.js?v=1768569614262"></script>
+  <script src="tabs/products.js?v=1768569614262"></script>
+  <script src="tabs/recipes.js?v=1768569614262"></script>
+  <script src="tabs/analysis.js?v=1768569614262"></script>
+  <script src="tabs/dashboard.js?v=1768569614262"></script>
+  <script src="app.js?v=1768569614262"></script>
 
   <script>
     // Global error handler
@@ -816,7 +840,7 @@
     // Register service worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js?v=1768256017878')
+        navigator.serviceWorker.register('service-worker.js?v=1768569614262')
           .then(reg => {
             console.log('Service Worker registered');
             reg.update();
