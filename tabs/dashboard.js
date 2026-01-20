@@ -5,7 +5,6 @@ var nrd = window.nrd;
 
 let dashboardProductsListener = null;
 let dashboardRecipesListener = null;
-let dashboardInputsListener = null;
 let dashboardLaborRolesListener = null;
 let dashboardIndirectCostsListener = null;
 
@@ -29,11 +28,10 @@ async function loadDashboardData() {
     }
     
     // Check if services are available
-    if (!nrdInstance.products || !nrdInstance.recipes || !nrdInstance.inputs || !nrdInstance.laborRoles || !nrdInstance.indirectCosts) {
+    if (!nrdInstance.products || !nrdInstance.recipes || !nrdInstance.laborRoles || !nrdInstance.indirectCosts) {
       logger.error('Services not available', {
         products: !!nrdInstance.products,
         recipes: !!nrdInstance.recipes,
-        inputs: !!nrdInstance.inputs,
         laborRoles: !!nrdInstance.laborRoles,
         indirectCosts: !!nrdInstance.indirectCosts,
         nrdKeys: nrdInstance ? Object.keys(nrdInstance) : 'nrd is null'
@@ -44,10 +42,9 @@ async function loadDashboardData() {
     logger.debug('Loading dashboard data');
 
     // Load all data
-    const [productsSnapshot, recipesSnapshot, inputsSnapshot, laborRolesSnapshot, indirectCostsSnapshot] = await Promise.all([
+    const [productsSnapshot, recipesSnapshot, laborRolesSnapshot, indirectCostsSnapshot] = await Promise.all([
       nrdInstance.products.getAll(),
       nrdInstance.recipes.getAll(),
-      nrdInstance.inputs.getAll(),
       nrdInstance.laborRoles.getAll(),
       nrdInstance.indirectCosts.getAll()
     ]);
@@ -66,13 +63,6 @@ async function loadDashboardData() {
         }, {})
       : recipesSnapshot || {};
 
-    const inputs = Array.isArray(inputsSnapshot)
-      ? inputsSnapshot.reduce((acc, i) => {
-          if (i && i.id) acc[i.id] = i;
-          return acc;
-        }, {})
-      : inputsSnapshot || {};
-
     const laborRoles = Array.isArray(laborRolesSnapshot)
       ? laborRolesSnapshot.reduce((acc, l) => {
           if (l && l.id) acc[l.id] = l;
@@ -90,7 +80,8 @@ async function loadDashboardData() {
     // Convert to arrays for analysis
     const productsArray = Object.values(products);
     const recipesArray = Object.values(recipes);
-    const inputsArray = Object.values(inputs);
+    // Filter products with esInsumo: true for inputs
+    const inputsArray = productsArray.filter(p => p.esInsumo === true);
     const laborRolesArray = Object.values(laborRoles);
     const indirectCostsArray = Object.values(indirectCosts);
 
@@ -110,7 +101,6 @@ async function loadDashboardData() {
     return {
       products,
       recipes,
-      inputs,
       laborRoles,
       indirectCosts,
       productsArray,
@@ -143,15 +133,14 @@ async function renderDashboard() {
     data.productsArray,
     data.recipesArray,
     {
-      inputs: data.inputs,
       products: data.products,
       laborRoles: data.laborRoles,
       indirectCostPerProduct: data.indirectCostPerProduct
     }
   );
 
-  // Get top inputs
-  const topInputs = getTopInputs(data.inputsArray, data.recipesArray, data.inputs, 10);
+  // Get top inputs (products with esInsumo: true)
+  const topInputs = getTopInputs(data.inputsArray, data.recipesArray, data.products, 10);
 
   // Get top labor roles
   const topLaborRoles = getTopLaborRoles(data.laborRolesArray, data.recipesArray, data.laborRoles, 10);
@@ -190,7 +179,7 @@ async function renderDashboard() {
           <div class="text-xs text-gray-500 mt-1">activas</div>
         </div>
         <div class="bg-white border border-gray-200 p-3 sm:p-4 rounded">
-          <div class="text-xs sm:text-sm text-gray-600 uppercase tracking-wider mb-1">Insumos</div>
+          <div class="text-xs sm:text-sm text-gray-600 uppercase tracking-wider mb-1">Productos (Insumos)</div>
           <div class="text-xl sm:text-2xl font-light text-gray-800">${totalInputs}</div>
         </div>
         <div class="bg-white border border-gray-200 p-3 sm:p-4 rounded">
@@ -278,20 +267,20 @@ async function renderDashboard() {
 
     <!-- Top Inputs Section -->
     <div class="mb-6 sm:mb-8">
-      <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-4">Top 10 Insumos Más Impactantes</h2>
+      <h2 class="text-lg sm:text-xl font-light text-gray-800 mb-4">Top 10 Productos (Insumos) Más Impactantes</h2>
       ${topInputs.length > 0 ? `
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         ${topInputs.map((item, index) => `
           <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
             <div class="flex items-start justify-between mb-2">
               <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
-                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.input.name)}
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.product.name)}
               </h3>
             </div>
             <div class="space-y-2 text-xs sm:text-sm">
               <div class="flex justify-between items-center py-1 border-b border-gray-100">
-                <span class="text-gray-600">Precio Unitario:</span>
-                <span class="font-medium">$${parseFloat(item.input.unitPrice || 0).toFixed(2)}/${item.input.unit || 'unidad'}</span>
+                <span class="text-gray-600">Costo Unitario:</span>
+                <span class="font-medium">$${parseFloat(item.product.cost || 0).toFixed(2)}/${item.product.unidadVenta || item.product.unidadProduccion || 'unidad'}</span>
               </div>
               <div class="flex justify-between items-center py-1 border-b border-gray-100">
                 <span class="text-gray-600">Impacto Total:</span>
@@ -307,7 +296,7 @@ async function renderDashboard() {
       </div>
       ` : `
       <div class="bg-gray-50 border border-gray-200 p-4 sm:p-6 rounded text-center">
-        <p class="text-gray-600 text-sm sm:text-base">No hay insumos registrados</p>
+        <p class="text-gray-600 text-sm sm:text-base">No hay productos con rol de insumo registrados</p>
       </div>
       `}
     </div>

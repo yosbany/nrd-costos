@@ -5,7 +5,6 @@ var nrd = window.nrd;
 
 let recipesListener = null;
 let recipesSearchTerm = '';
-let inputsData = {};
 let productsData = {};
 let laborRolesData = {};
 
@@ -44,16 +43,7 @@ function escapeHtml(text) {
 // Load data for calculations
 async function loadDataForCalculations() {
   try {
-    // Load inputs
-    const inputsSnapshot = await nrd.inputs.getAll();
-    inputsData = Array.isArray(inputsSnapshot) 
-      ? inputsSnapshot.reduce((acc, input) => {
-          if (input && input.id) acc[input.id] = input;
-          return acc;
-        }, {})
-      : inputsSnapshot || {};
-
-    // Load products
+    // Load products (including those with esInsumo: true)
     const productsSnapshot = await nrd.products.getAll();
     productsData = Array.isArray(productsSnapshot)
       ? productsSnapshot.reduce((acc, product) => {
@@ -150,7 +140,7 @@ function loadRecipes() {
         }
       }
 
-      const directCost = await calculateDirectCost(recipe, inputsData, productsData, laborRolesData);
+      const directCost = await calculateDirectCost(recipe, productsData, laborRolesData);
       const directUnitCost = calculateDirectUnitCost(directCost, recipe.batchYield || 1);
       
       const item = document.createElement('div');
@@ -276,7 +266,7 @@ function showRecipeForm(recipeId = null) {
         // Load inputs
         if (recipe.inputs && Array.isArray(recipe.inputs)) {
           recipe.inputs.forEach(input => {
-            addInputRow(input.inputId, input.inputType, input.quantity, false);
+            addInputRow(input.productId, input.quantity, false);
           });
         }
         
@@ -507,7 +497,7 @@ function updateRecipeProductSelection(items) {
   });
 }
 
-// Search inputs and products (for recipe inputs)
+// Search products with esInsumo: true (for recipe inputs)
 function searchInputsAndProducts(query) {
   const searchInput = document.getElementById('add-input-search');
   const resultsDiv = document.getElementById('add-input-search-results');
@@ -521,35 +511,27 @@ function searchInputsAndProducts(query) {
     return;
   }
   
-  // Filter inputs and products
-  const inputs = Object.values(inputsData)
-    .filter(input => input.name && input.name.toLowerCase().includes(searchTerm))
-    .map(input => ({ ...input, type: 'input' }));
-  
+  // Filter only products with esInsumo: true
   const products = Object.values(productsData)
-    .filter(p => p.active !== false && p.name && p.name.toLowerCase().includes(searchTerm))
-    .map(product => ({ ...product, type: 'product' }));
+    .filter(p => p.active !== false && p.esInsumo === true && p.name && p.name.toLowerCase().includes(searchTerm));
   
-  const filtered = [...inputs, ...products];
-  filteredInputsAndProducts = filtered;
+  filteredInputsAndProducts = products;
   selectedInputIndex = -1;
   
   // Build results HTML
   let resultsHTML = '';
   
-  if (filtered.length === 0) {
-    resultsHTML = '<div class="px-3 py-2 text-sm text-gray-500">No se encontraron insumos o productos</div>';
+  if (products.length === 0) {
+    resultsHTML = '<div class="px-3 py-2 text-sm text-gray-500">No se encontraron productos con rol de insumo</div>';
   } else {
-    resultsHTML = filtered.map((item, index) => {
-      const displayName = item.name || 'Sin nombre';
-      const displayInfo = item.type === 'input' 
-        ? `Insumo - ${item.unit || 'unidad'} - $${parseFloat(item.unitPrice || 0).toFixed(2)}`
-        : `Producto - $${parseFloat(item.cost || 0).toFixed(2)}`;
+    resultsHTML = products.map((product, index) => {
+      const displayName = product.name || 'Sin nombre';
+      const unit = product.unidadVenta || product.unidadProduccion || 'unidad';
+      const displayInfo = `Producto - ${unit} - $${parseFloat(product.cost || 0).toFixed(2)}`;
       
       return `
         <div class="input-search-item px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0" 
-             data-item-id="${item.id}" 
-             data-item-type="${item.type}"
+             data-item-id="${product.id}" 
              data-item-name="${escapeHtml(displayName)}"
              data-index="${index}">
           <div class="font-light text-sm">${escapeHtml(displayName)}</div>
@@ -570,17 +552,14 @@ function searchInputsAndProducts(query) {
   });
 }
 
-// Select input or product
+// Select product (as input)
 function selectInputOrProduct(item, searchInput, resultsDiv) {
   const itemId = item.dataset.itemId;
-  const itemType = item.dataset.itemType;
   const itemName = item.dataset.itemName;
   
   const hiddenInput = document.getElementById('add-input-select');
-  const typeInput = document.getElementById('add-input-type');
   
   if (hiddenInput) hiddenInput.value = itemId;
-  if (typeInput) typeInput.value = itemType;
   if (searchInput) searchInput.value = itemName;
   if (resultsDiv) resultsDiv.classList.add('hidden');
   
@@ -829,32 +808,24 @@ function updateLaborSelection(items) {
   });
 }
 
-// Add input row to recipe
-function addInputRow(inputId = '', inputType = 'input', quantity = '', allowRemove = true) {
+// Add input row to recipe (using product with esInsumo: true)
+function addInputRow(productId = '', quantity = '', allowRemove = true) {
   const inputsList = document.getElementById('recipe-inputs-list');
   if (!inputsList) return;
   
   const row = document.createElement('div');
   row.className = 'flex flex-col sm:flex-row gap-2 sm:gap-3 items-start sm:items-center p-2 sm:p-3 border border-gray-200 rounded mb-2';
   
-  const inputName = inputType === 'product' 
-    ? (productsData[inputId]?.name || 'Producto')
-    : (inputsData[inputId]?.name || 'Insumo');
-  
-  const currentPrice = inputType === 'product'
-    ? (productsData[inputId]?.cost || 0)
-    : (inputsData[inputId]?.unitPrice || 0);
-  
-  const unit = inputType === 'product'
-    ? 'unidad'
-    : (inputsData[inputId]?.unit || 'unidad');
+  const product = productsData[productId];
+  const productName = product?.name || 'Producto';
+  const currentPrice = product?.cost || 0;
+  const unit = product?.unidadVenta || product?.unidadProduccion || 'unidad';
   
   row.innerHTML = `
-    <input type="hidden" class="input-id" value="${escapeHtml(inputId)}">
-    <input type="hidden" class="input-type" value="${escapeHtml(inputType)}">
+    <input type="hidden" class="input-id" value="${escapeHtml(productId)}">
     <div class="flex-1">
-      <div class="text-sm font-medium">${escapeHtml(inputName)}</div>
-      <div class="text-xs text-gray-500">${inputType === 'product' ? 'Producto' : 'Insumo'} - Precio actual: $${parseFloat(currentPrice).toFixed(2)}/${unit}</div>
+      <div class="text-sm font-medium">${escapeHtml(productName)}</div>
+      <div class="text-xs text-gray-500">Producto (Insumo) - Precio actual: $${parseFloat(currentPrice).toFixed(2)}/${unit}</div>
     </div>
     <div class="w-full sm:w-32">
       <label class="block text-xs text-gray-600 mb-1">Cantidad</label>
@@ -897,16 +868,14 @@ function addInputRow(inputId = '', inputType = 'input', quantity = '', allowRemo
 
 // Update input row subtotal
 function updateInputRowSubtotal(row) {
-  const inputId = row.querySelector('.input-id')?.value;
-  const inputType = row.querySelector('.input-type')?.value;
+  const productId = row.querySelector('.input-id')?.value;
   const quantity = parseFloat(row.querySelector('.input-quantity')?.value || 0);
   const subtotalEl = row.querySelector('[data-subtotal]');
   
-  if (!subtotalEl || !inputId) return;
+  if (!subtotalEl || !productId) return;
   
-  const currentPrice = inputType === 'product'
-    ? (productsData[inputId]?.cost || 0)
-    : (inputsData[inputId]?.unitPrice || 0);
+  const product = productsData[productId];
+  const currentPrice = product?.cost || 0;
   
   subtotalEl.textContent = `$${(quantity * parseFloat(currentPrice)).toFixed(2)}`;
 }
@@ -999,11 +968,10 @@ async function updateRecipeCalculations() {
   const inputs = [];
   const inputsRows = document.querySelectorAll('#recipe-inputs-list > div');
   inputsRows.forEach(row => {
-    const inputId = row.querySelector('.input-id')?.value;
-    const inputType = row.querySelector('.input-type')?.value;
+    const productId = row.querySelector('.input-id')?.value;
     const quantity = parseFloat(row.querySelector('.input-quantity')?.value || 0);
-    if (inputId && inputType && quantity > 0) {
-      inputs.push({ inputId, inputType, quantity });
+    if (productId && quantity > 0) {
+      inputs.push({ productId, quantity });
     }
   });
   
@@ -1024,7 +992,7 @@ async function updateRecipeCalculations() {
     labor
   };
   
-  const directCost = await calculateDirectCost(recipe, inputsData, productsData, laborRolesData);
+  const directCost = await calculateDirectCost(recipe, productsData, laborRolesData);
   const directUnitCost = calculateDirectUnitCost(directCost, batchYield);
   
   const product = productsData[productId];
@@ -1102,7 +1070,7 @@ async function viewRecipe(recipeId) {
       return;
     }
 
-    const directCost = await calculateDirectCost(recipe, inputsData, productsData, laborRolesData);
+    const directCost = await calculateDirectCost(recipe, productsData, laborRolesData);
     const directUnitCost = calculateDirectUnitCost(directCost, recipe.batchYield || 1);
     const targetMargin = product.targetMargin || 0;
     const suggestedPrice = calculateSuggestedPrice(directUnitCost, targetMargin);
@@ -1125,18 +1093,15 @@ async function viewRecipe(recipeId) {
       if (recipe.inputs && recipe.inputs.length > 0) {
         inputsHtml = '<div class="space-y-2">';
         for (const recipeInput of recipe.inputs) {
-          const inputName = recipeInput.inputType === 'product'
-            ? (productsData[recipeInput.inputId]?.name || 'Producto')
-            : (inputsData[recipeInput.inputId]?.name || 'Insumo');
-          const unitPrice = recipeInput.inputType === 'product'
-            ? (productsData[recipeInput.inputId]?.cost || 0)
-            : (inputsData[recipeInput.inputId]?.unitPrice || 0);
-          const unit = recipeInput.inputType === 'product'
-            ? 'unidad'
-            : (inputsData[recipeInput.inputId]?.unit || 'unidad');
+          // Support both old format (inputId/inputType) and new format (productId)
+          const productId = recipeInput.productId || recipeInput.inputId;
+          const product = productsData[productId];
+          const inputName = product?.name || 'Producto';
+          const unitPrice = product?.cost || 0;
+          const unit = product?.unidadVenta || product?.unidadProduccion || 'unidad';
           inputsHtml += `
             <div class="flex justify-between py-2 border-b border-gray-200 text-sm">
-              <span>${escapeHtml(inputName)} (${recipeInput.inputType === 'product' ? 'Producto' : 'Insumo'})</span>
+              <span>${escapeHtml(inputName)} (Producto)</span>
               <span>${parseFloat(recipeInput.quantity || 0).toFixed(2)} ${unit} × $${parseFloat(unitPrice).toFixed(2)} = <span class="font-medium">$${(parseFloat(recipeInput.quantity || 0) * parseFloat(unitPrice)).toFixed(2)}</span></span>
             </div>
           `;
@@ -1322,15 +1287,14 @@ function setupRecipeFormHandler() {
       return;
     }
 
-    // Collect inputs
+    // Collect inputs (products with esInsumo: true)
     const inputs = [];
     const inputsRows = document.querySelectorAll('#recipe-inputs-list > div');
     inputsRows.forEach(row => {
-      const inputId = row.querySelector('.input-id')?.value;
-      const inputType = row.querySelector('.input-type')?.value;
+      const productId = row.querySelector('.input-id')?.value;
       const quantity = parseFloat(row.querySelector('.input-quantity')?.value || 0);
-      if (inputId && inputType && quantity > 0) {
-        inputs.push({ inputId, inputType, quantity });
+      if (productId && quantity > 0) {
+        inputs.push({ productId, quantity });
       }
     });
 
@@ -1374,16 +1338,21 @@ function setupRecipeFormHandler() {
   if (addInputBtn) {
     addInputBtn.addEventListener('click', () => {
       const hiddenInput = document.getElementById('add-input-select');
-      const typeInput = document.getElementById('add-input-type');
       const searchInput = document.getElementById('add-input-search');
       const quantityInput = document.getElementById('add-input-quantity');
       
-      const inputId = hiddenInput?.value;
-      const inputType = typeInput?.value || 'input';
+      const productId = hiddenInput?.value;
       const quantity = quantityInput?.value || '';
       
-      if (!inputId) {
-        showError('Por favor seleccione un insumo o producto');
+      if (!productId) {
+        showError('Por favor seleccione un producto con rol de insumo');
+        return;
+      }
+      
+      // Verify that the product has esInsumo: true
+      const product = productsData[productId];
+      if (!product || product.esInsumo !== true) {
+        showError('El producto seleccionado debe tener el rol de insumo activado');
         return;
       }
       
@@ -1392,12 +1361,11 @@ function setupRecipeFormHandler() {
         return;
       }
       
-      addInputRow(inputId, inputType, quantity);
+      addInputRow(productId, quantity);
       updateRecipeCalculations();
       
       // Reset form
       if (hiddenInput) hiddenInput.value = '';
-      if (typeInput) typeInput.value = 'input';
       if (searchInput) searchInput.value = '';
       if (quantityInput) quantityInput.value = '';
     });

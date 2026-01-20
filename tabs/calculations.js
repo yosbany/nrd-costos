@@ -1,29 +1,20 @@
 // Calculation module for cost analysis
 
 // Calculate direct cost of a batch using current real-time prices
-async function calculateDirectCost(recipe, inputsData, productsData, laborRolesData) {
+async function calculateDirectCost(recipe, productsData, laborRolesData) {
   let cost = 0;
   
-  // Sum of inputs (quantity × current price)
+  // Sum of inputs (products with esInsumo: true) - quantity × current cost
   if (recipe.inputs && recipe.inputs.length > 0) {
     for (const recipeInput of recipe.inputs) {
-      let unitPrice = 0;
+      // Support both old format (inputId/inputType) and new format (productId)
+      const productId = recipeInput.productId || recipeInput.inputId;
+      const product = productsData[productId];
       
-      if (recipeInput.inputType === 'product') {
-        // It's a subproduct - use calculated cost of the product
-        const product = productsData[recipeInput.inputId];
-        if (product && product.cost) {
-          unitPrice = product.cost; // Use calculated cost of the product
-        }
-      } else {
-        // It's a direct input - use current unit price
-        const input = inputsData[recipeInput.inputId];
-        if (input) {
-          unitPrice = input.unitPrice;
-        }
+      if (product && product.cost !== undefined) {
+        // Use calculated cost of the product
+        cost += recipeInput.quantity * product.cost;
       }
-      
-      cost += recipeInput.quantity * unitPrice;
     }
   }
   
@@ -91,18 +82,20 @@ function getProfitabilityStatus(realMargin, targetMargin) {
   return 'profitable'; // Profitable
 }
 
-// Calculate impact of an input in all recipes
-function calculateInputImpact(inputId, recipes, inputsData) {
+// Calculate impact of a product (with esInsumo: true) in all recipes
+function calculateInputImpact(productId, recipes, productsData) {
   let totalImpact = 0;
   let recipeCount = 0;
   
   recipes.forEach(recipe => {
     if (recipe.inputs && recipe.active) {
       recipe.inputs.forEach(recipeInput => {
-        if (recipeInput.inputId === inputId && recipeInput.inputType === 'input') {
-          const input = inputsData[inputId];
-          if (input) {
-            totalImpact += recipeInput.quantity * input.unitPrice;
+        // Support both old format (inputId/inputType) and new format (productId)
+        const inputProductId = recipeInput.productId || recipeInput.inputId;
+        if (inputProductId === productId) {
+          const product = productsData[productId];
+          if (product && product.cost !== undefined) {
+            totalImpact += recipeInput.quantity * product.cost;
             recipeCount++;
           }
         }
@@ -155,7 +148,7 @@ function getProductsWithIssues(products, recipes, calculationsData) {
     }
     
     // Calculate costs and margins using calculation module functions
-    const directCost = calculateDirectCost(activeRecipe, calculationsData.inputs, calculationsData.products, calculationsData.laborRoles);
+    const directCost = calculateDirectCost(activeRecipe, calculationsData.products, calculationsData.laborRoles);
     const directUnitCost = calculateDirectUnitCost(directCost, activeRecipe.batchYield);
     const indirectUnitCost = calculateIndirectUnitCost(calculationsData.indirectCostPerProduct, activeRecipe.batchYield);
     const totalUnitCost = calculateTotalUnitCost(directUnitCost, indirectUnitCost);
@@ -205,14 +198,17 @@ function getProductsWithIssues(products, recipes, calculationsData) {
   return issues;
 }
 
-// Get top N inputs by impact
-function getTopInputs(inputs, recipes, inputsData, n = 10) {
+// Get top N products (with esInsumo: true) by impact
+function getTopInputs(products, recipes, productsData, n = 10) {
   const impacts = [];
   
-  inputs.forEach(input => {
-    const impact = calculateInputImpact(input.id, recipes, inputsData);
+  // Filter only products with esInsumo: true
+  const inputProducts = products.filter(p => p.esInsumo === true);
+  
+  inputProducts.forEach(product => {
+    const impact = calculateInputImpact(product.id, recipes, productsData);
     impacts.push({
-      input,
+      product,
       ...impact
     });
   });

@@ -17,7 +17,7 @@ function switchView(viewName) {
   currentView = viewName;
 
   // Hide all views
-  const views = ['dashboard', 'recipes', 'inputs', 'labor-roles', 'indirect-costs', 'analysis'];
+  const views = ['dashboard', 'recipes', 'labor-roles', 'indirect-costs', 'analysis'];
   views.forEach(view => {
     const viewElement = document.getElementById(`${view}-view`);
     if (viewElement) {
@@ -49,13 +49,7 @@ function switchView(viewName) {
 
   // Load data for the view
   logger.debug('Loading view data', { viewName });
-  if (viewName === 'inputs') {
-    if (typeof initializeInputs === 'function') {
-      initializeInputs();
-    } else if (typeof loadInputs === 'function') {
-      loadInputs();
-    }
-  } else if (viewName === 'labor-roles') {
+  if (viewName === 'labor-roles') {
     if (typeof initializeLaborRoles === 'function') {
       initializeLaborRoles();
     } else if (typeof loadLaborRoles === 'function') {
@@ -123,7 +117,7 @@ function waitForServices(maxWait = 5000) {
       }
       
       const servicesAvailable = nrdInstance.products && nrdInstance.recipes && 
-                                nrdInstance.inputs && nrdInstance.laborRoles && 
+                                nrdInstance.laborRoles && 
                                 nrdInstance.indirectCosts;
       
       if (servicesAvailable) {

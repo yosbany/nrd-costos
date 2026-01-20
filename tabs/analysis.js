@@ -5,13 +5,11 @@ var nrd = window.nrd;
 
 let analysisProductsListener = null;
 let analysisRecipesListener = null;
-let analysisInputsListener = null;
 let analysisLaborRolesListener = null;
 let analysisIndirectCostsListener = null;
 
 let analysisProductsData = {};
 let analysisRecipesData = {};
-let analysisInputsData = {};
 let analysisLaborRolesData = {};
 let analysisIndirectCostsData = {};
 
@@ -43,15 +41,6 @@ async function loadAnalysisData() {
           return acc;
         }, {})
       : recipesSnapshot || {};
-
-    // Load inputs
-    const inputsSnapshot = await nrd.inputs.getAll();
-    analysisInputsData = Array.isArray(inputsSnapshot)
-      ? inputsSnapshot.reduce((acc, input) => {
-          if (input && input.id) acc[input.id] = input;
-          return acc;
-        }, {})
-      : inputsSnapshot || {};
 
     // Load labor roles
     const laborRolesSnapshot = await nrd.laborRoles.getAll();
@@ -87,7 +76,6 @@ async function loadAnalysisData() {
     return {
       productsData: analysisProductsData,
       recipesData: analysisRecipesData,
-      inputsData: analysisInputsData,
       laborRolesData: analysisLaborRolesData,
       indirectCostsData: analysisIndirectCostsData,
       indirectCostPerProduct,
@@ -145,7 +133,6 @@ async function calculateProductAnalysis(productId, analysisData, variantId = nul
   // Calculate direct cost
   const directCost = await calculateDirectCost(
     activeRecipe,
-    analysisData.inputsData,
     analysisData.productsData,
     analysisData.laborRolesData
   );
