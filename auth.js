@@ -3,31 +3,108 @@
 var nrd = window.nrd;
 
 let currentUser = null;
+let authCheckComplete = false;
+
+// Show redirecting screen
+function showRedirectingScreen() {
+  const redirectingScreen = document.getElementById('redirecting-screen');
+  const loginScreen = document.getElementById('login-screen');
+  const appScreen = document.getElementById('app-screen');
+  
+  if (redirectingScreen) redirectingScreen.classList.remove('hidden');
+  if (loginScreen) loginScreen.classList.add('hidden');
+  if (appScreen) appScreen.classList.add('hidden');
+}
+
+// Hide redirecting screen
+function hideRedirectingScreen() {
+  const redirectingScreen = document.getElementById('redirecting-screen');
+  if (redirectingScreen) redirectingScreen.classList.add('hidden');
+}
+
+// Check for stored token in localStorage
+function hasStoredToken() {
+  try {
+    // Firebase stores auth tokens in localStorage with keys like "firebase:authUser:{API_KEY}:{PROJECT_ID}"
+    const keys = Object.keys(localStorage);
+    const firebaseAuthKeys = keys.filter(key => key.startsWith('firebase:authUser:'));
+    return firebaseAuthKeys.length > 0;
+  } catch (error) {
+    logger.error('Error checking stored token', error);
+    return false;
+  }
+}
+
+// Initialize auth check
+function initAuthCheck() {
+  // Show redirecting screen first
+  showRedirectingScreen();
+  
+  // Check if there's a stored token
+  const hasToken = hasStoredToken();
+  
+  if (hasToken) {
+    logger.debug('Stored token found, waiting for auth state change');
+    // Wait a bit for Firebase to restore the session
+    setTimeout(() => {
+      if (!authCheckComplete) {
+        // If still not authenticated after timeout, show login
+        logger.info('Token found but authentication not restored, showing login');
+        hideRedirectingScreen();
+        showLoginScreen();
+      }
+    }, 2000); // 2 second timeout
+  } else {
+    logger.debug('No stored token found, showing login immediately');
+    // No token, show login immediately
+    setTimeout(() => {
+      hideRedirectingScreen();
+      showLoginScreen();
+    }, 300); // Small delay for smooth transition
+  }
+}
 
 // Listen for auth state changes using NRD Data Access
 if (nrd && nrd.auth) {
   nrd.auth.onAuthStateChanged((user) => {
-  try {
-    currentUser = user;
-    if (user) {
-      logger.info('User authenticated, showing app screen', { uid: user.uid, email: user.email });
-      showAppScreen();
-    } else {
-      logger.info('User not authenticated, showing login screen');
-      showLoginScreen();
+    try {
+      authCheckComplete = true;
+      currentUser = user;
+      
+      // Hide redirecting screen
+      hideRedirectingScreen();
+      
+      if (user) {
+        logger.info('User authenticated, showing app screen', { uid: user.uid, email: user.email });
+        showAppScreen();
+      } else {
+        logger.info('User not authenticated, showing login screen');
+        showLoginScreen();
+      }
+    } catch (error) {
+      logger.error('Error in auth state change', error);
+      hideRedirectingScreen();
+      const loginScreen = document.getElementById('login-screen');
+      const appScreen = document.getElementById('app-screen');
+      if (loginScreen) loginScreen.classList.remove('hidden');
+      if (appScreen) appScreen.classList.add('hidden');
     }
-  } catch (error) {
-    logger.error('Error in auth state change', error);
-    const loginScreen = document.getElementById('login-screen');
-    const appScreen = document.getElementById('app-screen');
-    if (loginScreen) loginScreen.classList.remove('hidden');
-    if (appScreen) appScreen.classList.add('hidden');
-  }
   });
+  
+  // Initialize auth check when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthCheck);
+  } else {
+    initAuthCheck();
+  }
 } else {
   logger.error('nrd or nrd.auth is not available');
-  // Still show login screen if nrd is not available
-  showLoginScreen();
+  // Still show redirecting screen first
+  showRedirectingScreen();
+  setTimeout(() => {
+    hideRedirectingScreen();
+    showLoginScreen();
+  }, 300);
 }
 
 // Show login screen

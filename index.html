@@ -61,8 +61,16 @@
     </div>
   </div>
 
+  <!-- Redirecting Screen -->
+  <div id="redirecting-screen" class="min-h-screen flex items-center justify-center bg-white">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-600 font-light">Redirigiendo...</p>
+    </div>
+  </div>
+
   <!-- Login Screen -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 sm:p-6">
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 sm:p-6 hidden">
     <div class="w-full max-w-sm">
       <h1 class="text-xl sm:text-2xl font-light text-center mb-6 sm:mb-8 tracking-tight">NRD Costos</h1>
       <form id="login-form" class="space-y-3 sm:space-y-4">
