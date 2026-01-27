@@ -24,6 +24,12 @@ function loadIndirectCosts() {
     indirectCostsListener = null;
   }
 
+  const nrd = window.nrd;
+  if (!nrd) {
+    logger.error('NRD service not available');
+    return;
+  }
+  
   indirectCostsListener = nrd.indirectCosts.onValue((indirectCosts) => {
     if (!indirectCostsList) return;
     indirectCostsList.innerHTML = '';
@@ -114,6 +120,11 @@ function showIndirectCostForm(costId = null) {
       saveBtn.classList.add('bg-blue-600', 'border-blue-600', 'hover:bg-blue-700');
     }
     (async () => {
+      const nrd = window.nrd;
+      if (!nrd) {
+        await (window.showError || alert)('Servicio no disponible');
+        return;
+      }
       const cost = await nrd.indirectCosts.getById(costId);
       if (cost) {
         const nameInput = document.getElementById('indirect-cost-name');
@@ -152,7 +163,13 @@ function hideIndirectCostForm() {
 }
 
 async function saveIndirectCost(costId, costData) {
-  const user = getCurrentUser();
+  const nrd = window.nrd;
+  if (!nrd) {
+    await (window.showError || alert)('Servicio no disponible');
+    return;
+  }
+  
+  const user = (window.authService && window.authService.getCurrentUser && window.authService.getCurrentUser()) || null;
   if (costId) {
     logger.info('Updating indirect cost', { costId, name: costData.name });
     await nrd.indirectCosts.update(costId, costData);
@@ -161,6 +178,11 @@ async function saveIndirectCost(costId, costData) {
     return { key: costId };
   } else {
     logger.info('Creating new indirect cost', { name: costData.name });
+    const nrd = window.nrd;
+    if (!nrd) {
+      await (window.showError || alert)('Servicio no disponible');
+      return;
+    }
     const id = await nrd.indirectCosts.create(costData);
     logger.audit('ENTITY_CREATE', { entity: 'indirectCost', id, data: costData, uid: user?.uid, email: user?.email, timestamp: Date.now() });
     logger.info('Indirect cost created successfully', { id, name: costData.name });
@@ -252,6 +274,11 @@ async function deleteIndirectCostHandler(costId) {
   const user = getCurrentUser();
   logger.info('Deleting indirect cost', { costId });
   try {
+    const nrd = window.nrd;
+    if (!nrd) {
+      await (window.showError || alert)('Servicio no disponible');
+      return;
+    }
     await nrd.indirectCosts.delete(costId);
     logger.audit('ENTITY_DELETE', { entity: 'indirectCost', id: costId, uid: user?.uid, email: user?.email, timestamp: Date.now() });
     logger.info('Indirect cost deleted successfully', { costId });
@@ -295,7 +322,10 @@ function setupIndirectCostFormHandler() {
   });
 }
 
-function initializeIndirectCosts() {
+/**
+ * Initialize indirect costs view
+ */
+export function initializeIndirectCosts() {
   setupIndirectCostFormHandler();
   
   const searchInput = document.getElementById('indirect-costs-search-input');

@@ -1,7 +1,12 @@
-// Recipe management with real-time cost calculations
-
-// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
-var nrd = window.nrd;
+// Recipe management with real-time cost calculations (ES Module)
+// Using NRDCommon from CDN (loaded in index.html)
+const logger = window.logger || console;
+const escapeHtml = window.escapeHtml || ((text) => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+});
 
 let recipesListener = null;
 let recipesSearchTerm = '';
@@ -32,17 +37,16 @@ let laborKeyboardHandler = null;
 let selectedLaborIndex = -1;
 let filteredLabors = [];
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 // Load data for calculations
 async function loadDataForCalculations() {
   try {
+    // Get nrd instance dynamically
+    const nrd = window.nrd;
+    if (!nrd) {
+      logger.error('NRD service not available');
+      return;
+    }
+    
     // Load products (including those with esInsumo: true)
     const productsSnapshot = await nrd.products.getAll();
     productsData = Array.isArray(productsSnapshot)
@@ -1413,8 +1417,10 @@ function setupRecipeFormHandler() {
   }
 }
 
-// Initialize recipes tab
-function initializeRecipes() {
+/**
+ * Initialize recipes view
+ */
+export function initializeRecipes() {
   setupRecipeFormHandler();
   
   const searchInput = document.getElementById('recipes-search-input');

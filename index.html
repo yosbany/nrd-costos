@@ -6,17 +6,38 @@
   <meta name="description" content="Sistema de gestión de costos">
   <title>NRD Costos</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Tailwind CSS via CDN (development) - Warning suppressed for this project architecture -->
+  <script>
+    // Suppress Tailwind CDN production warning BEFORE loading Tailwind (this project uses CDN by design)
+    (function() {
+      if (console.warn) {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          // Suppress Tailwind CDN production warning
+          if (args[0] && typeof args[0] === 'string' && 
+              (args[0].includes('cdn.tailwindcss.com should not be used in production') ||
+               args[0].includes('cdn.tailwindcss.com'))) {
+            return; // Suppress this specific warning
+          }
+          originalWarn.apply(console, args);
+        };
+      }
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="styles.css?v=1768858031712">
+  <script>
+    // Ensure a global logger exists early so libraries can reference it safely
+    window.logger = window.logger || console;
+  </script>
+  <link rel="stylesheet" href="assets/styles/styles.css?v=1769508307282">
   <meta name="theme-color" content="#dc2626">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   
   <!-- Force cache reload with version parameter in URL -->
   <script>
     (function() {
-      // Get current version from stylesheet link (this is the source of truth)
-      const stylesheet = document.querySelector('link[href*="styles.css"]');
+      const stylesheet = document.querySelector('link[href*="assets/styles/styles.css"]');
       const versionMatch = stylesheet ? stylesheet.href.match(/[?&]v=(\d+)/) : null;
       const currentVersion = versionMatch ? versionMatch[1] : Date.now();
       
@@ -74,7 +95,7 @@
     <div class="w-full max-w-sm">
       <h1 class="text-xl sm:text-2xl font-light text-center mb-6 sm:mb-8 tracking-tight">NRD Costos</h1>
       <form id="login-form" class="space-y-3 sm:space-y-4">
-        <input type="email" id="login-email" placeholder="Email" required 
+        <input type="email" id="login-email" placeholder="Email" autocomplete="username" required 
           class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
         <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password" required 
           class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
@@ -83,41 +104,17 @@
           Iniciar Sesión
         </button>
       </form>
-      <div id="login-error" class="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-gray-600"></div>
+      <div id="login-error" class="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-red-600 hidden"></div>
     </div>
   </div>
 
   <!-- Main App Screen -->
   <div id="app-screen" class="min-h-screen flex flex-col hidden">
-    <header class="bg-red-600 border-b border-red-700 px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center sticky top-0 z-10">
-      <div class="flex items-center gap-2 sm:gap-3">
-        <img src="icon-192.png" alt="NRD Costos" class="w-8 h-8 sm:w-10 sm:h-10 rounded">
-        <h1 class="text-lg sm:text-xl font-light tracking-tight text-white">NRD Costos</h1>
-      </div>
-      
-      <!-- Lado Derecho: Botonera -->
-      <div class="flex gap-2 items-center">
-        <!-- Botón Instalar (opcional, oculto por defecto) -->
-        <button id="install-btn" 
-          class="px-3 sm:px-4 py-1.5 sm:py-2 border border-white/30 hover:border-white text-white hover:bg-white/10 transition-colors uppercase tracking-wider text-xs font-light hidden">
-          Instalar
-        </button>
-        
-        <!-- Botón Perfil (siempre visible) -->
-        <button id="profile-btn" 
-          class="px-3 sm:px-4 py-1.5 sm:py-2 border border-white/30 hover:border-white text-white hover:bg-white/10 transition-colors uppercase tracking-wider text-xs font-light">
-          Perfil
-        </button>
-      </div>
-    </header>
+    <!-- Header will be inserted here by NRDCommon -->
+    <div id="app-header-container" data-app-name="NRD Costos" data-icon-path="assets/icons/icon-192.png"></div>
 
-    <nav class="bg-white border-b border-gray-200 flex overflow-x-auto sticky top-[45px] sm:top-[53px] z-10 bg-white">
-      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-red-600 text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="dashboard">Inicio</button>
-      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="recipes">Recetas</button>
-      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="labor-roles">Mano de Obra</button>
-      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="indirect-costs">Costos Indirectos</button>
-      <button class="nav-btn flex-1 px-3 sm:px-4 py-3 sm:py-3.5 border-b-2 border-transparent text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light" data-view="analysis">Análisis</button>
-    </nav>
+    <!-- Navigation will be inserted here by app.js -->
+    <nav id="app-nav-container" class="bg-white border-b border-gray-200 flex overflow-x-auto"></nav>
 
     <main class="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto max-w-6xl mx-auto w-full">
       <!-- Dashboard View -->
@@ -486,7 +483,7 @@
         <!-- User data will be inserted here -->
       </div>
       <div class="p-4 sm:p-6 border-t border-gray-200 space-y-2">
-        <a href="https://yosbany.github.io/nrd-portal" 
+        <a id="portal-link" href="/nrd-portal/" 
           class="block w-full px-4 sm:px-6 py-2 bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light text-center">
           Ir al Portal
         </a>
@@ -565,49 +562,184 @@
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-  
-  <!-- NRD Data Access Library -->
-  <script src="https://cdn.jsdelivr.net/gh/yosbany/nrd-data-access@main/dist/nrd-data-access.js"></script>
-  
-  <!-- Logger (must load before other app scripts) -->
-  <script src="logger.js"></script>
-  
-  <!-- Firebase Configuration and Initialization -->
+  <!-- NRD Data Access Library (load synchronously, no defer) -->
+  <!-- Firebase is bundled within NRD Data Access Library, no need to load it separately -->
+  <!-- Use local files in development (localhost/127.0.0.1), CDN in production -->
   <script>
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyD02egBPI7FnsliANDKa8noTkVmGMW0POg",
-      authDomain: "nrd-db.firebaseapp.com",
-      databaseURL: "https://nrd-db-default-rtdb.firebaseio.com",
-      projectId: "nrd-db",
-      storageBucket: "nrd-db.firebasestorage.app",
-      messagingSenderId: "544444461682",
-      appId: "1:544444461682:web:110c97ffffc984ddd208eb"
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-
-    // Initialize NRD Data Access Library (make it global)
-    window.nrd = new NRDDataAccess();
-    // Note: Don't declare nrd here to avoid conflicts with other scripts
-    // All scripts should use window.nrd directly
+    (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      
+      const nrdDataAccessSrc = isLocalhost 
+        ? '/nrd-data-access/dist/nrd-data-access.js'
+        : 'https://cdn.jsdelivr.net/gh/yosbany/nrd-data-access@main/dist/nrd-data-access.js';
+      
+      console.log('Loading NRD Data Access from:', nrdDataAccessSrc);
+      
+      const script1 = document.createElement('script');
+      script1.src = nrdDataAccessSrc;
+      script1.onerror = function() {
+        console.error('Failed to load NRD Data Access from:', nrdDataAccessSrc);
+      };
+      script1.onload = function() {
+        console.log('NRD Data Access loaded successfully');
+      };
+      document.head.appendChild(script1);
+    })();
   </script>
   
-  <!-- App Scripts -->
-  <script src="modal.js?v=1768858031712"></script>
-  <script src="auth.js?v=1768858031712"></script>
-  <script src="tabs/calculations.js?v=1768858031712"></script>
-  <script src="tabs/labor-roles.js?v=1768858031712"></script>
-  <script src="tabs/indirect-costs.js?v=1768858031712"></script>
-  <script src="tabs/recipes.js?v=1768858031712"></script>
-  <script src="tabs/analysis.js?v=1768858031712"></script>
-  <script src="tabs/dashboard.js?v=1768858031712"></script>
-  <script src="app.js?v=1768858031712"></script>
+  <!-- NRD Common Library (load synchronously, no defer) -->
+  <!-- Use local files in development (localhost/127.0.0.1), CDN in production -->
+  <script>
+    (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      
+      const nrdCommonSrc = isLocalhost 
+        ? '/nrd-common/dist/nrd-common.js'
+        : 'https://cdn.jsdelivr.net/gh/yosbany/nrd-common@main/dist/nrd-common.js';
+      
+      console.log('Loading NRD Common from:', nrdCommonSrc);
+      
+      const script2 = document.createElement('script');
+      script2.src = nrdCommonSrc;
+      script2.onerror = function() {
+        console.error('Failed to load NRD Common from:', nrdCommonSrc);
+      };
+      script2.onload = function() {
+        console.log('NRD Common loaded successfully');
+      };
+      document.head.appendChild(script2);
+    })();
+  </script>
+  
+  <!-- NRD Common Library Initialization -->
+  <script>
+    // Wait for NRD Common Library to be available and initialize
+    (function() {
+      const maxWait = 10000;
+      const startTime = Date.now();
+      
+      const checkNRDCommon = setInterval(() => {
+        if (typeof window.NRDCommon !== 'undefined') {
+          clearInterval(checkNRDCommon);
+          console.log('NRD Common Library loaded successfully');
+          
+          // Create logger instance FIRST, before anything else uses it
+          // This is critical because AuthService and NavigationService need it
+          window.logger = new window.NRDCommon.Logger('NRD Costos', {
+            logLevel: window.NRDCommon.LOG_LEVELS.INFO,
+            enableColors: true,
+            enableTimestamp: true
+          });
+          
+          // Expose common functions globally for backward compatibility
+          if (window.NRDCommon) {
+            window.showAlert = window.NRDCommon.showAlert;
+            window.showConfirm = window.NRDCommon.showConfirm;
+            window.showError = window.NRDCommon.showError;
+            window.showSuccess = window.NRDCommon.showSuccess;
+            window.showInfo = window.NRDCommon.showInfo;
+            window.showWarning = window.NRDCommon.showWarning;
+            window.showSpinner = window.NRDCommon.showSpinner;
+            window.hideSpinner = window.NRDCommon.hideSpinner;
+            window.formatNumber = window.NRDCommon.formatNumber;
+            window.formatCurrency = window.NRDCommon.formatCurrency;
+            window.formatDecimalWithComma = window.NRDCommon.formatDecimalWithComma;
+            window.parseDecimalWithComma = window.NRDCommon.parseDecimalWithComma;
+            window.escapeHtml = window.NRDCommon.escapeHtml;
+            window.getMonthName = window.NRDCommon.getMonthName;
+            window.formatDate = window.NRDCommon.formatDate;
+            window.isEmployeeActiveInYear = window.NRDCommon.isEmployeeActiveInYear;
+            
+            // Header is now automatically initialized by AuthService
+          }
+          
+          // Initialize NRD Data Access using NRDCommon
+          if (window.NRDCommon.initializeNRD) {
+            window.NRDCommon.initializeNRD().then(success => {
+              if (success) {
+                console.log('NRD Data Access initialized successfully');
+                
+                // Initialize AuthService immediately after NRD is ready
+                // window.logger is already created above, so AuthService can use it
+                if (window.NRDCommon.AuthService && window.nrd) {
+                  try {
+                    window.authService = new window.NRDCommon.AuthService(window.nrd);
+                    console.log('AuthService initialized successfully');
+                  } catch (error) {
+                    console.error('Error initializing AuthService:', error);
+                    // Fallback: hide redirecting screen and show login
+                    const redirectingScreen = document.getElementById('redirecting-screen');
+                    const loginScreen = document.getElementById('login-screen');
+                    if (redirectingScreen) redirectingScreen.classList.add('hidden');
+                    if (loginScreen) loginScreen.classList.remove('hidden');
+                  }
+                } else {
+                  console.error('AuthService or nrd not available');
+                  // Fallback: hide redirecting screen and show login
+                  const redirectingScreen = document.getElementById('redirecting-screen');
+                  const loginScreen = document.getElementById('login-screen');
+                  if (redirectingScreen) redirectingScreen.classList.add('hidden');
+                  if (loginScreen) loginScreen.classList.remove('hidden');
+                }
+              } else {
+                console.error('NRD Data Access initialization failed');
+                // Fallback: hide redirecting screen and show login
+                const redirectingScreen = document.getElementById('redirecting-screen');
+                const loginScreen = document.getElementById('login-screen');
+                if (redirectingScreen) redirectingScreen.classList.add('hidden');
+                if (loginScreen) loginScreen.classList.remove('hidden');
+              }
+            }).catch(error => {
+              console.error('Error initializing NRD Data Access:', error);
+              // Fallback: hide redirecting screen and show login
+              const redirectingScreen = document.getElementById('redirecting-screen');
+              const loginScreen = document.getElementById('login-screen');
+              if (redirectingScreen) redirectingScreen.classList.add('hidden');
+              if (loginScreen) loginScreen.classList.remove('hidden');
+            });
+          } else {
+            console.error('initializeNRD not available in NRDCommon');
+            // Fallback: hide redirecting screen and show login
+            const redirectingScreen = document.getElementById('redirecting-screen');
+            const loginScreen = document.getElementById('login-screen');
+            if (redirectingScreen) redirectingScreen.classList.add('hidden');
+            if (loginScreen) loginScreen.classList.remove('hidden');
+          }
+        } else if (Date.now() - startTime >= maxWait) {
+          clearInterval(checkNRDCommon);
+          console.error('NRD Common Library not loaded after timeout');
+          // Fallback: hide redirecting screen and show login
+          const redirectingScreen = document.getElementById('redirecting-screen');
+          const loginScreen = document.getElementById('login-screen');
+          if (redirectingScreen) redirectingScreen.classList.add('hidden');
+          if (loginScreen) loginScreen.classList.remove('hidden');
+        }
+      }, 100);
+    })();
+  </script>
+  
+  <!-- NRD Data Access Library Initialization -->
+  <!-- IMPORTANT: All modules MUST use window.nrd (NRD Data Access Library) -->
+  <!-- DO NOT access firebase directly in any module - use nrd.products, nrd.recipes, nrd.auth, etc. -->
+  <!-- Firebase is initialized internally by NRD Data Access Library -->
+  
+  <!-- Business Logic Modules (load with defer) -->
+  <script type="module" src="modules/calculations.js" defer></script>
+  
+  <!-- View Modules (load with defer) -->
+  <script type="module" src="views/dashboard/dashboard.js" defer></script>
+  <script type="module" src="views/recipes/recipes.js" defer></script>
+  <script type="module" src="views/labor-roles/labor-roles.js" defer></script>
+  <script type="module" src="views/indirect-costs/indirect-costs.js" defer></script>
+  <script type="module" src="views/analysis/analysis.js" defer></script>
+  
+  <!-- Main App (load last with defer) -->
+  <!-- Note: AuthService and NavigationService are now loaded from NRDCommon CDN -->
+  <script type="module" src="app.js?v=1769508307282" defer></script>
 
   <script>
     // Global error handler
@@ -626,7 +758,7 @@
     // Register service worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js?v=1768858031712')
+        navigator.serviceWorker.register('service-worker.js?v=1769508307282')
           .then(reg => {
             console.log('Service Worker registered');
             reg.update();
@@ -637,34 +769,18 @@
       });
     }
 
-    // PWA Install prompt
-    let deferredPrompt = null;
-    const installBtn = document.getElementById('install-btn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (installBtn) installBtn.classList.remove('hidden');
-    });
-
-    if (installBtn) {
-      installBtn.addEventListener('click', async () => {
-        if (!deferredPrompt) {
-          await showInfo('Para instalar la app, usa el menú del navegador.');
-          return;
-        }
-        
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        if (installBtn) installBtn.classList.add('hidden');
-      });
+    // PWA Install prompt is now handled by NRDCommon.setupInstallButton()
+    
+    // Setup portal link URL based on environment
+    const portalLink = document.getElementById('portal-link');
+    if (portalLink) {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      portalLink.href = isLocalhost 
+        ? '/nrd-portal/'
+        : 'https://yosbany.github.io/nrd-portal';
     }
-
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      if (installBtn) installBtn.classList.add('hidden');
-    });
   </script>
 </body>
 </html>

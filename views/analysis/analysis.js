@@ -1,7 +1,12 @@
-// Product analysis with real-time calculations and price simulator
-
-// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
-var nrd = window.nrd;
+// Product analysis with real-time calculations and price simulator (ES Module)
+// Using NRDCommon from CDN (loaded in index.html)
+const logger = window.logger || console;
+const escapeHtml = window.escapeHtml || ((text) => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+});
 
 let analysisProductsListener = null;
 let analysisRecipesListener = null;
@@ -13,18 +18,18 @@ let analysisRecipesData = {};
 let analysisLaborRolesData = {};
 let analysisIndirectCostsData = {};
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+// Note: nrd is accessed via window.nrd dynamically in each function
 
 // Load all data for analysis
 async function loadAnalysisData() {
   try {
     // Load products
+    const nrd = window.nrd;
+    if (!nrd) {
+      logger.error('NRD service not available');
+      return null;
+    }
+    
     const productsSnapshot = await nrd.products.getAll();
     analysisProductsData = Array.isArray(productsSnapshot)
       ? productsSnapshot.reduce((acc, product) => {
@@ -453,10 +458,29 @@ async function showPriceSimulator(productId, totalCost, currentPrice, variantId 
   };
 }
 
-// Initialize analysis tab
-function initializeAnalysis() {
+/**
+ * Initialize analysis view
+ */
+export function initializeAnalysis() {
   // Check if services are available
-  if (!nrd.products || !nrd.recipes || !nrd.inputs || !nrd.laborRoles || !nrd.indirectCosts) {
+  // Note: inputs is not a separate service - it's products filtered by esInsumo: true
+  const nrd = window.nrd;
+  if (!nrd) {
+    logger.error('NRD service not available');
+    const analysisTable = document.getElementById('analysis-table');
+    if (analysisTable) {
+      analysisTable.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 p-4 sm:p-6 rounded text-center">
+          <p class="text-yellow-700 text-sm sm:text-base mb-2">
+            ⚠️ Los servicios aún no están disponibles.
+          </p>
+        </div>
+      `;
+    }
+    return;
+  }
+  
+  if (!nrd.products || !nrd.recipes || !nrd.laborRoles || !nrd.indirectCosts) {
     const analysisTable = document.getElementById('analysis-table');
     if (analysisTable) {
       analysisTable.innerHTML = `
@@ -474,9 +498,9 @@ function initializeAnalysis() {
   }
 
   // Setup listeners for real-time updates
+  // Note: inputs are products with esInsumo: true, so we listen to products changes
   if (analysisProductsListener) analysisProductsListener();
   if (analysisRecipesListener) analysisRecipesListener();
-  if (analysisInputsListener) analysisInputsListener();
   if (analysisLaborRolesListener) analysisLaborRolesListener();
   if (analysisIndirectCostsListener) analysisIndirectCostsListener();
 
@@ -485,10 +509,6 @@ function initializeAnalysis() {
   });
 
   analysisRecipesListener = nrd.recipes.onValue(() => {
-    renderAnalysisTable();
-  });
-
-  analysisInputsListener = nrd.inputs.onValue(() => {
     renderAnalysisTable();
   });
 

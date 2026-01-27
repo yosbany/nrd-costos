@@ -1,7 +1,7 @@
-// Calculation module for cost analysis
+// Calculation module for cost analysis (ES Module)
 
 // Calculate direct cost of a batch using current real-time prices
-async function calculateDirectCost(recipe, productsData, laborRolesData) {
+export async function calculateDirectCost(recipe, productsData, laborRolesData) {
   let cost = 0;
   
   // Sum of inputs (products with esInsumo: true) - quantity × current cost
@@ -32,13 +32,13 @@ async function calculateDirectCost(recipe, productsData, laborRolesData) {
 }
 
 // Calculate direct unit cost
-function calculateDirectUnitCost(directCost, batchYield) {
+export function calculateDirectUnitCost(directCost, batchYield) {
   if (batchYield <= 0) return 0;
   return directCost / batchYield;
 }
 
 // Calculate indirect cost proration (equal distribution among products with recipes)
-function calculateIndirectCostPerProduct(indirectCosts, productsWithRecipesCount) {
+export function calculateIndirectCostPerProduct(indirectCosts, productsWithRecipesCount) {
   if (productsWithRecipesCount <= 0) return 0;
   
   // Sum all monthly indirect costs
@@ -51,18 +51,18 @@ function calculateIndirectCostPerProduct(indirectCosts, productsWithRecipesCount
 }
 
 // Calculate indirect unit cost for a product
-function calculateIndirectUnitCost(indirectCostPerProduct, batchYield) {
+export function calculateIndirectUnitCost(indirectCostPerProduct, batchYield) {
   if (batchYield <= 0) return 0;
   return indirectCostPerProduct / batchYield;
 }
 
 // Calculate total unit cost
-function calculateTotalUnitCost(directUnitCost, indirectUnitCost) {
+export function calculateTotalUnitCost(directUnitCost, indirectUnitCost) {
   return directUnitCost + indirectUnitCost;
 }
 
 // Calculate suggested price
-function calculateSuggestedPrice(totalUnitCost, targetMargin) {
+export function calculateSuggestedPrice(totalUnitCost, targetMargin) {
   if (!targetMargin || targetMargin <= 0 || targetMargin >= 100) {
     return totalUnitCost; // Without target margin, return cost
   }
@@ -70,20 +70,20 @@ function calculateSuggestedPrice(totalUnitCost, targetMargin) {
 }
 
 // Calculate real margin
-function calculateRealMargin(sellingPrice, totalUnitCost) {
+export function calculateRealMargin(sellingPrice, totalUnitCost) {
   if (sellingPrice <= 0) return 0;
   return ((sellingPrice - totalUnitCost) / sellingPrice) * 100;
 }
 
 // Determine profitability status
-function getProfitabilityStatus(realMargin, targetMargin) {
+export function getProfitabilityStatus(realMargin, targetMargin) {
   if (realMargin < 0) return 'loss'; // Loss
   if (!targetMargin || realMargin < targetMargin) return 'low-margin'; // Low margin
   return 'profitable'; // Profitable
 }
 
 // Calculate impact of a product (with esInsumo: true) in all recipes
-function calculateInputImpact(productId, recipes, productsData) {
+export function calculateInputImpact(productId, recipes, productsData) {
   let totalImpact = 0;
   let recipeCount = 0;
   
@@ -107,7 +107,7 @@ function calculateInputImpact(productId, recipes, productsData) {
 }
 
 // Calculate impact of a role in all recipes
-function calculateLaborRoleImpact(roleId, recipes, laborRolesData) {
+export function calculateLaborRoleImpact(roleId, recipes, laborRolesData) {
   let totalImpact = 0;
   let recipeCount = 0;
   let totalHours = 0;
@@ -131,10 +131,11 @@ function calculateLaborRoleImpact(roleId, recipes, laborRolesData) {
 }
 
 // Get products with margin issues
-function getProductsWithIssues(products, recipes, calculationsData) {
+export async function getProductsWithIssues(products, recipes, calculationsData) {
   const issues = [];
   
-  products.forEach(product => {
+  // Process products sequentially to handle async calculateDirectCost
+  for (const product of products) {
     const activeRecipe = recipes.find(r => r.productId === product.id && r.active);
     
     if (!activeRecipe) {
@@ -144,11 +145,11 @@ function getProductsWithIssues(products, recipes, calculationsData) {
         severity: 'low',
         message: 'Sin receta definida'
       });
-      return;
+      continue;
     }
     
     // Calculate costs and margins using calculation module functions
-    const directCost = calculateDirectCost(activeRecipe, calculationsData.products, calculationsData.laborRoles);
+    const directCost = await calculateDirectCost(activeRecipe, calculationsData.products, calculationsData.laborRoles);
     const directUnitCost = calculateDirectUnitCost(directCost, activeRecipe.batchYield);
     const indirectUnitCost = calculateIndirectUnitCost(calculationsData.indirectCostPerProduct, activeRecipe.batchYield);
     const totalUnitCost = calculateTotalUnitCost(directUnitCost, indirectUnitCost);
@@ -180,7 +181,7 @@ function getProductsWithIssues(products, recipes, calculationsData) {
         suggestedPrice: calculateSuggestedPrice(totalUnitCost, product.targetMargin)
       });
     }
-  });
+  }
   
   // Sort by severity: high (loss) first, then medium (low margin), then low (no recipe)
   const severityOrder = { high: 0, medium: 1, low: 2 };
@@ -199,7 +200,7 @@ function getProductsWithIssues(products, recipes, calculationsData) {
 }
 
 // Get top N products (with esInsumo: true) by impact
-function getTopInputs(products, recipes, productsData, n = 10) {
+export function getTopInputs(products, recipes, productsData, n = 10) {
   const impacts = [];
   
   // Filter only products with esInsumo: true
@@ -220,7 +221,7 @@ function getTopInputs(products, recipes, productsData, n = 10) {
 }
 
 // Get top N roles by impact
-function getTopLaborRoles(laborRoles, recipes, laborRolesData, n = 10) {
+export function getTopLaborRoles(laborRoles, recipes, laborRolesData, n = 10) {
   const impacts = [];
   
   laborRoles.forEach(role => {
@@ -238,7 +239,7 @@ function getTopLaborRoles(laborRoles, recipes, laborRolesData, n = 10) {
 }
 
 // Get top N indirect costs
-function getTopIndirectCosts(indirectCosts, n = 10) {
+export function getTopIndirectCosts(indirectCosts, n = 10) {
   // Sort by monthly amount (highest first)
   const sorted = [...indirectCosts].sort((a, b) => (b.monthlyAmount || 0) - (a.monthlyAmount || 0));
   

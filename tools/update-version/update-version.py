@@ -29,19 +29,26 @@ def update_version():
     
     # Add version parameter to CSS
     html = re.sub(
-        r'(<link[^>]*href=["\'])(styles\.css)(["\'][^>]*>)',
+        r'(<link[^>]*href=["\'])(assets/styles/styles\.css)(["\'][^>]*>)',
         rf'\1\2?v={version}\3',
         html
     )
     
-    # Add version parameter to JS files (except Firebase CDN and external libraries)
+    # Add version parameter to JS files (app.js and service-worker.js)
     html = re.sub(
-        r'(<script[^>]*src=["\'])(modal\.js|auth\.js|tabs/inputs\.js|tabs/labor-roles\.js|tabs/indirect-costs\.js|tabs/calculations\.js|tabs/products\.js|tabs/recipes\.js|tabs/analysis\.js|tabs/dashboard\.js|app\.js)(["\'][^>]*>)',
+        r'(<script[^>]*src=["\'])(app\.js|service-worker\.js)(["\'][^>]*>)',
         rf'\1\2?v={version}\3',
         html
     )
     
-    # Add version parameter to service worker
+    # Add version parameter to nrd-data-access and nrd-common (local development)
+    html = re.sub(
+        r'(<script[^>]*src=["\'])(/nrd-data-access/dist/nrd-data-access\.js|/nrd-common/dist/nrd-common\.js)(["\'][^>]*>)',
+        rf'\1\2?v={version}\3',
+        html
+    )
+    
+    # Add version parameter to service worker registration
     html = re.sub(
         r'(serviceWorker\.register\(["\'])(service-worker\.js)(["\'])',
         rf'\1\2?v={version}\3',

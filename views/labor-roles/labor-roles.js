@@ -1,18 +1,15 @@
-// Labor roles management
-
-// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
-var nrd = window.nrd;
-
-let laborRolesListener = null;
-let laborRolesSearchTerm = '';
-
-// Helper function to escape HTML
-function escapeHtml(text) {
+// Labor roles management (ES Module)
+// Using NRDCommon from CDN (loaded in index.html)
+const logger = window.logger || console;
+const escapeHtml = window.escapeHtml || ((text) => {
   if (!text) return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-}
+});
+
+let laborRolesListener = null;
+let laborRolesSearchTerm = '';
 
 // Load labor roles
 function loadLaborRoles() {
@@ -32,6 +29,12 @@ function loadLaborRoles() {
   }
 
   logger.debug('Setting up labor roles listener');
+  const nrd = window.nrd;
+  if (!nrd) {
+    logger.error('NRD service not available');
+    return;
+  }
+  
   laborRolesListener = nrd.laborRoles.onValue((laborRoles) => {
     logger.debug('Labor roles data received', { count: Array.isArray(laborRoles) ? laborRoles.length : Object.keys(laborRoles || {}).length });
     if (!laborRolesList) return;
@@ -123,6 +126,11 @@ function showLaborRoleForm(roleId = null) {
       saveBtn.classList.add('bg-blue-600', 'border-blue-600', 'hover:bg-blue-700');
     }
     (async () => {
+      const nrd = window.nrd;
+      if (!nrd) {
+        await (window.showError || alert)('Servicio no disponible');
+        return;
+      }
       const role = await nrd.laborRoles.getById(roleId);
       if (role) {
         const nameInput = document.getElementById('labor-role-name');
@@ -162,12 +170,22 @@ async function saveLaborRole(roleId, roleData) {
   const user = getCurrentUser();
   if (roleId) {
     logger.info('Updating labor role', { roleId, name: roleData.name });
+    const nrd = window.nrd;
+    if (!nrd) {
+      await (window.showError || alert)('Servicio no disponible');
+      return;
+    }
     await nrd.laborRoles.update(roleId, roleData);
     logger.audit('ENTITY_UPDATE', { entity: 'laborRole', id: roleId, data: roleData, uid: user?.uid, email: user?.email, timestamp: Date.now() });
     logger.info('Labor role updated successfully', { roleId });
     return { key: roleId };
   } else {
     logger.info('Creating new labor role', { name: roleData.name });
+    const nrd = window.nrd;
+    if (!nrd) {
+      await (window.showError || alert)('Servicio no disponible');
+      return;
+    }
     const id = await nrd.laborRoles.create(roleData);
     logger.audit('ENTITY_CREATE', { entity: 'laborRole', id, data: roleData, uid: user?.uid, email: user?.email, timestamp: Date.now() });
     logger.info('Labor role created successfully', { id, name: roleData.name });
@@ -255,6 +273,11 @@ async function deleteLaborRoleHandler(roleId) {
   const user = getCurrentUser();
   logger.info('Deleting labor role', { roleId });
   try {
+    const nrd = window.nrd;
+    if (!nrd) {
+      await (window.showError || alert)('Servicio no disponible');
+      return;
+    }
     await nrd.laborRoles.delete(roleId);
     logger.audit('ENTITY_DELETE', { entity: 'laborRole', id: roleId, uid: user?.uid, email: user?.email, timestamp: Date.now() });
     logger.info('Labor role deleted successfully', { roleId });
@@ -298,8 +321,10 @@ function setupLaborRoleFormHandler() {
   });
 }
 
-// Initialize labor roles tab
-function initializeLaborRoles() {
+/**
+ * Initialize labor roles view
+ */
+export function initializeLaborRoles() {
   setupLaborRoleFormHandler();
   
   const searchInput = document.getElementById('labor-roles-search-input');

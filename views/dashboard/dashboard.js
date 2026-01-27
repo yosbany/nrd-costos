@@ -1,26 +1,31 @@
-// Dashboard with monitoring and top impacts
+// Dashboard with monitoring and top impacts (ES Module)
+// Using NRDCommon from CDN (loaded in index.html)
+const logger = window.logger || console;
 
-// Get nrd instance safely (always use window.nrd as it's set globally in index.html)
-var nrd = window.nrd;
+// Import calculation functions from modules
+import {
+  calculateDirectCost,
+  calculateDirectUnitCost,
+  calculateIndirectUnitCost,
+  calculateTotalUnitCost,
+  calculateRealMargin,
+  calculateSuggestedPrice,
+  getProductsWithIssues,
+  getTopInputs,
+  getTopLaborRoles,
+  getTopIndirectCosts
+} from '../../modules/calculations.js';
 
 let dashboardProductsListener = null;
 let dashboardRecipesListener = null;
 let dashboardLaborRolesListener = null;
 let dashboardIndirectCostsListener = null;
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 // Load all data for dashboard
 async function loadDashboardData() {
   try {
-    // Use window.nrd (already set at the top of the file)
-    const nrdInstance = window.nrd || nrd;
+    // Get nrd instance dynamically (initialized in index.html)
+    const nrdInstance = window.nrd;
     
     if (!nrdInstance) {
       logger.error('nrd instance not found');
@@ -129,7 +134,7 @@ async function renderDashboard() {
   }
 
   // Get products with issues
-  const productsWithIssues = getProductsWithIssues(
+  const productsWithIssues = await getProductsWithIssues(
     data.productsArray,
     data.recipesArray,
     {
@@ -237,7 +242,7 @@ async function renderDashboard() {
           return `
             <div class="bg-white border ${severityBorder} rounded p-3 sm:p-4 shadow-sm">
               <div class="flex items-start justify-between mb-2">
-                <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">${escapeHtml(issue.product.name)}</h3>
+                <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">${(window.escapeHtml || ((t) => t || ''))(issue.product.name)}</h3>
                 <span class="px-2 py-1 text-xs rounded ${severityBg} ml-2 whitespace-nowrap">${issueLabel}</span>
               </div>
               <div class="space-y-2 text-xs sm:text-sm">
@@ -274,7 +279,7 @@ async function renderDashboard() {
           <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
             <div class="flex items-start justify-between mb-2">
               <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
-                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.product.name)}
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${(window.escapeHtml || ((t) => t || ''))(item.product.name)}
               </h3>
             </div>
             <div class="space-y-2 text-xs sm:text-sm">
@@ -310,7 +315,7 @@ async function renderDashboard() {
           <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
             <div class="flex items-start justify-between mb-2">
               <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
-                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.role.name)}
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${(window.escapeHtml || ((t) => t || ''))(item.role.name)}
               </h3>
             </div>
             <div class="space-y-2 text-xs sm:text-sm">
@@ -350,7 +355,7 @@ async function renderDashboard() {
           <div class="bg-white border border-gray-200 rounded p-3 sm:p-4 shadow-sm">
             <div class="flex items-start justify-between mb-2">
               <h3 class="text-sm sm:text-base font-medium text-gray-800 flex-1">
-                <span class="text-gray-500 font-light">${index + 1}.</span> ${escapeHtml(item.cost.name)}
+                <span class="text-gray-500 font-light">${index + 1}.</span> ${(window.escapeHtml || ((t) => t || ''))(item.cost.name)}
               </h3>
             </div>
             <div class="space-y-2 text-xs sm:text-sm">
@@ -383,9 +388,12 @@ async function renderDashboard() {
 let initializeDashboardRetryCount = 0;
 const MAX_RETRIES = 10; // Maximum 10 retries (3 seconds total)
 
-function initializeDashboard() {
-  // Use window.nrd (already set at the top of the file)
-  const nrdInstance = window.nrd || nrd;
+/**
+ * Initialize dashboard view
+ */
+export function initializeDashboard() {
+  // Get nrd instance dynamically (initialized in index.html)
+  const nrdInstance = window.nrd;
   
   // Check if nrd instance exists
   if (!nrdInstance) {
@@ -408,16 +416,16 @@ function initializeDashboard() {
   }
   
   // Check if services are available
+  // Note: inputs is not a separate service - it's products filtered by esInsumo: true
   const servicesStatus = {
     products: !!nrdInstance.products,
     recipes: !!nrdInstance.recipes,
-    inputs: !!nrdInstance.inputs,
     laborRoles: !!nrdInstance.laborRoles,
     indirectCosts: !!nrdInstance.indirectCosts
   };
   
   const allServicesAvailable = servicesStatus.products && servicesStatus.recipes && 
-                                servicesStatus.inputs && servicesStatus.laborRoles && 
+                                servicesStatus.laborRoles && 
                                 servicesStatus.indirectCosts;
   
   if (!allServicesAvailable) {
@@ -431,7 +439,6 @@ function initializeDashboard() {
         const missingServices = [];
         if (!servicesStatus.products) missingServices.push('products');
         if (!servicesStatus.recipes) missingServices.push('recipes');
-        if (!servicesStatus.inputs) missingServices.push('inputs');
         if (!servicesStatus.laborRoles) missingServices.push('laborRoles');
         if (!servicesStatus.indirectCosts) missingServices.push('indirectCosts');
         
@@ -474,9 +481,9 @@ function initializeDashboard() {
   initializeDashboardRetryCount = 0;
 
   // Setup listeners for real-time updates
+  // Note: inputs are products with esInsumo: true, so we listen to products changes
   if (dashboardProductsListener) dashboardProductsListener();
   if (dashboardRecipesListener) dashboardRecipesListener();
-  if (dashboardInputsListener) dashboardInputsListener();
   if (dashboardLaborRolesListener) dashboardLaborRolesListener();
   if (dashboardIndirectCostsListener) dashboardIndirectCostsListener();
 
@@ -485,10 +492,6 @@ function initializeDashboard() {
   });
 
   dashboardRecipesListener = nrdInstance.recipes.onValue(() => {
-    renderDashboard();
-  });
-
-  dashboardInputsListener = nrdInstance.inputs.onValue(() => {
     renderDashboard();
   });
 
