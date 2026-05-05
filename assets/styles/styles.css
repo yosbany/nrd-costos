@@ -1,0 +1,97 @@
+/* Minimal custom styles - most styling handled by Tailwind */
+.hidden {
+  display: none !important;
+}
+
+/* Mobile: safe area para teléfonos con notch, padding inferior extra */
+/* Safe area para teléfonos con notch */
+.main-mobile {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+}
+body {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Touch targets mínimos (44px recomendado para móvil) */
+@media (max-width: 640px) {
+  .nav-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+  button, [role="button"], input[type="submit"], input[type="button"], a.button {
+    min-height: 44px;
+  }
+  #new-recipe-btn,
+  #save-recipe-btn,
+  #cancel-recipe-btn,
+  #edit-recipe-detail-btn,
+  #delete-recipe-detail-btn,
+  #print-recipe-detail-btn,
+  #close-recipe-detail-btn,
+  #add-input-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Inputs más grandes para touch */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  select {
+    min-height: 44px;
+    font-size: 16px; /* Evita zoom en iOS al enfocar */
+  }
+  textarea {
+    font-size: 16px;
+    min-height: 5rem;
+  }
+  /* Modales con scroll si el contenido es alto */
+  #profile-modal > div,
+  #custom-modal > div,
+  #custom-alert > div {
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media print {
+  @page {
+    size: portrait;
+    margin: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Solo imprimir el detalle de la receta */
+  #app-header-container,
+  #app-nav-container,
+  #dashboard-view,
+  #recipes-view .flex.flex-col,
+  #recipes-search-input,
+  #recipes-list,
+  #recipe-form {
+    display: none !important;
+  }
+
+  #recipe-detail {
+    display: block !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  #recipe-detail.hidden {
+    display: block !important;
+  }
+
+  main {
+    padding: 0.5rem !important;
+    max-width: none !important;
+  }
+}

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Sistema de gestión de costos">
+  <title>NRD Costos</title>
+  <link rel="manifest" href="manifest.json">
+  <!-- Tailwind CSS via CDN (development) - Warning suppressed for this project architecture -->
+  <script>
+    // Suppress Tailwind CDN production warning BEFORE loading Tailwind (this project uses CDN by design)
+    (function() {
+      if (console.warn) {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          // Suppress Tailwind CDN production warning
+          if (args[0] && typeof args[0] === 'string' && 
+              (args[0].includes('cdn.tailwindcss.com should not be used in production') ||
+               args[0].includes('cdn.tailwindcss.com'))) {
+            return; // Suppress this specific warning
+          }
+          originalWarn.apply(console, args);
+        };
+      }
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Ensure a global logger exists early so libraries can reference it safely
+    window.logger = window.logger || console;
+  </script>
+  <link rel="stylesheet" href="assets/styles/styles.css?v=1773568749318">
+  <meta name="theme-color" content="#dc2626">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <!-- Validate version against server: if server has newer build, force reload to avoid stale cache -->
+  <script>
+    (function() {
+      var RELOAD_KEY = 'nrd-version-reload-ts';
+      var RELOAD_COOLDOWN_MS = 15000;
+      var lastReload = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
+      if (Date.now() - lastReload < RELOAD_COOLDOWN_MS) return;
+
+      var link = document.querySelector('link[rel="stylesheet"][href*=".css"]');
+      var match = link && link.href && link.href.match(/[?&]v=(\d+)/);
+      var localVersion = match ? String(match[1]) : null;
+      if (!localVersion) return;
+
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          var serverVersion = data && data.v != null ? String(data.v) : null;
+          if (!serverVersion) return;
+          if (serverVersion === localVersion) return;
+
+          sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+
+          var sw = ('serviceWorker' in navigator)
+            ? navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+              })
+            : Promise.resolve();
+
+          var cacheClear = ('caches' in window)
+            ? caches.keys().then(function(names) { names.forEach(function(n) { caches.delete(n); }); })
+            : Promise.resolve();
+
+          Promise.all([sw, cacheClear]).finally(function() {
+            window.location.reload();
+          });
+        })
+        .catch(function() {});
+    })();
+  </script>
+</head>
+<body class="bg-white text-black font-sans antialiased">
+  <!-- Loading Spinner -->
+  <div id="loading-spinner" class="fixed inset-0 bg-black/20 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 flex flex-col items-center gap-4 shadow-lg">
+      <div class="w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-600 font-light">Cargando...</p>
+    </div>
+  </div>
+
+  <!-- Redirecting Screen -->
+  <div id="redirecting-screen" class="min-h-screen flex items-center justify-center bg-white">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-600 font-light">Redirigiendo...</p>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 sm:p-6 hidden">
+    <div class="w-full max-w-sm">
+      <h1 class="text-xl sm:text-2xl font-light text-center mb-6 sm:mb-8 tracking-tight">NRD Costos</h1>
+      <form id="login-form" class="space-y-3 sm:space-y-4">
+        <input type="email" id="login-email" placeholder="Email" autocomplete="username" required 
+          class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+        <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password" required 
+          class="w-full px-0 py-2.5 sm:py-3 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+        <button type="submit" 
+          class="w-full mt-4 sm:mt-6 py-2.5 sm:py-3 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+          Iniciar Sesión
+        </button>
+      </form>
+      <div id="login-error" class="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-red-600 hidden"></div>
+    </div>
+  </div>
+
+  <!-- Main App Screen -->
+  <div id="app-screen" class="min-h-screen flex flex-col hidden">
+    <!-- Header will be inserted here by NRDCommon -->
+    <div id="app-header-container" data-app-name="NRD Costos" data-icon-path="assets/icons/icon-192.png"></div>
+
+    <!-- Navigation will be inserted here by app.js -->
+    <nav id="app-nav-container" class="bg-white border-b border-gray-200 flex overflow-x-auto overflow-y-hidden flex-nowrap shrink-0 min-h-[3rem]"></nav>
+
+    <main class="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto max-w-6xl mx-auto w-full main-mobile">
+      <!-- Dashboard View -->
+      <div id="dashboard-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div id="dashboard-content">
+          <p class="text-gray-500 text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
+
+      <!-- Recipes View -->
+      <div id="recipes-view" class="view space-y-3 sm:space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-2 sm:gap-0 mb-2 sm:mb-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button id="new-recipe-btn" 
+              class="w-full sm:w-auto px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Nueva Receta
+            </button>
+          </div>
+        </div>
+        
+        <!-- Search Filter -->
+        <div class="mb-3 sm:mb-4">
+          <input type="text" id="recipes-search-input" 
+            placeholder="Buscar recetas por producto..." 
+            class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 bg-white text-sm sm:text-base rounded">
+        </div>
+        
+        <div id="recipes-list" class="space-y-2 sm:space-y-3"></div>
+
+        <!-- Recipe Detail View -->
+        <div id="recipe-detail" class="border border-gray-200 p-3 sm:p-4 md:p-6 hidden overflow-hidden">
+          <div id="recipe-detail-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold tracking-tight text-white">Detalle de la Receta</h3>
+                <p class="text-sm text-white/90 mt-1">Visualice la información completa de la receta</p>
+              </div>
+              <button id="back-to-recipes" 
+                class="no-print text-white hover:text-gray-200 text-2xl font-light min-w-[44px] min-h-[44px] w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-white/20 transition-colors -mr-1">×</button>
+            </div>
+          </div>
+          <div id="recipe-detail-content"></div>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 no-print">
+            <button id="edit-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Editar
+            </button>
+            <button id="delete-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Eliminar
+            </button>
+            <button id="print-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-500 text-white border border-gray-500 hover:bg-gray-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Imprimir
+            </button>
+            <button id="close-recipe-detail-btn" 
+              class="flex-1 px-4 sm:px-6 py-2 bg-gray-600 text-white border border-gray-600 hover:bg-gray-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        <!-- Recipe Form -->
+        <div id="recipe-form" class="border border-gray-200 p-3 sm:p-4 md:p-6 mt-3 sm:mt-4 hidden overflow-hidden">
+          <div id="recipe-form-header" class="px-4 sm:px-6 py-4 sm:py-5 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-3 sm:mb-4 bg-green-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 id="recipe-form-title" class="text-lg sm:text-xl font-semibold tracking-tight text-white">Nueva Receta</h3>
+                <p id="recipe-form-subtitle" class="text-sm text-white/90 mt-1">Cree una nueva receta para un producto</p>
+              </div>
+              <button id="close-recipe-form" class="text-white hover:text-gray-200 text-2xl font-light min-w-[44px] min-h-[44px] w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-white/20 transition-colors -mr-1">×</button>
+            </div>
+          </div>
+          <form id="recipe-form-element">
+            <input type="hidden" id="recipe-id">
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Producto</label>
+              <div class="relative">
+                <input type="text" id="recipe-product-search" placeholder="Buscar producto producible..." 
+                  class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+                <input type="hidden" id="recipe-product" required>
+                <div id="recipe-product-search-results" 
+                  class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                </div>
+              </div>
+            </div>
+            <div class="mb-4 sm:mb-6 hidden" id="recipe-variant-container">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Variante</label>
+              <select id="recipe-variant" 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base">
+                <option value="">Seleccione una variante...</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">Este producto tiene variantes. Debe seleccionar una variante para la receta.</p>
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label for="recipe-batch-yield" class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Rendimiento del Lote (unidades)</label>
+              <input type="number" id="recipe-batch-yield" step="0.01" min="0.01" required 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="Cantidad de unidades que rinde el lote">
+              <p id="recipe-batch-yield-info" class="text-xs mt-1 hidden"></p>
+            </div>
+            
+            <!-- Labor Section (single field in minutes) -->
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Tiempo del Lote (minutos)</label>
+              <input type="number" id="recipe-labor-minutes" step="0.01" min="0" 
+                class="w-full px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-red-600 bg-transparent text-sm sm:text-base"
+                placeholder="Minutos de tiempo del lote">
+            </div>
+            
+            <!-- Materia Prima (Inputs Section) -->
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-2 text-xs uppercase tracking-wider text-gray-600">Materia Prima (Insumos)</label>
+              <div id="recipe-inputs-list" class="space-y-2 mb-3"></div>
+              <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 p-3 bg-gray-50 rounded border border-gray-200">
+                <div class="relative flex-1">
+                  <input type="text" id="add-input-search" placeholder="Buscar producto con rol de insumo..." 
+                    class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                  <input type="hidden" id="add-input-select">
+                  <div id="add-input-search-results" 
+                    class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  </div>
+                </div>
+                <input type="number" id="add-input-quantity" step="0.01" min="0" placeholder="Cantidad" 
+                  class="w-full sm:w-32 px-2 py-1 border border-gray-300 rounded text-sm">
+                <button type="button" id="add-input-btn" 
+                  class="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">
+                  Agregar
+                </button>
+              </div>
+            </div>
+            
+            <div class="mb-4 sm:mb-6">
+              <label class="flex items-center">
+                <input type="checkbox" id="recipe-active" checked class="mr-2">
+                <span class="text-xs uppercase tracking-wider text-gray-600">Activa</span>
+              </label>
+            </div>
+            <div class="mb-4 sm:mb-6">
+              <label class="block mb-1.5 sm:mb-2 text-xs uppercase tracking-wider text-gray-600">Observación o procedimiento</label>
+              <textarea id="recipe-observacion" rows="3" placeholder="Notas, observaciones o descripción del procedimiento..."
+                class="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-red-600 text-sm rounded"></textarea>
+            </div>
+            <!-- Cálculos Finales -->
+            <div class="mb-4 sm:mb-6 p-3 bg-blue-50 rounded border border-blue-200">
+              <label class="block mb-2 text-xs uppercase tracking-wider text-blue-800 font-medium">Cálculos Finales</label>
+              <div id="recipe-calculations" class="text-sm text-gray-500">
+                <p>Complete el producto y el rendimiento para ver los cálculos</p>
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-200">
+              <button type="submit" id="save-recipe-btn"
+                class="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white border border-green-600 hover:bg-green-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Guardar
+              </button>
+              <button type="button" id="cancel-recipe-btn" 
+                class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+
+    </main>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg sm:text-xl font-light tracking-tight">Perfil de Usuario</h3>
+        <button id="close-profile-modal" class="text-gray-400 hover:text-red-600 text-xl font-light">×</button>
+      </div>
+      <div id="profile-modal-content" class="p-4 sm:p-6 space-y-4">
+        <!-- User data will be inserted here -->
+      </div>
+      <div class="p-4 sm:p-6 border-t border-gray-200 space-y-2">
+        <a id="portal-link" href="/nrd-portal/" 
+          class="block w-full px-4 sm:px-6 py-2 bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light text-center">
+          Ir al Portal
+        </a>
+        <button id="profile-logout-btn" 
+          class="w-full px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+          Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Modal -->
+  <div id="custom-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6">
+        <h3 id="modal-title" class="text-lg sm:text-xl font-light mb-3 sm:mb-4 text-black"></h3>
+        <p id="modal-message" class="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6"></p>
+        <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <button id="modal-confirm" class="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Confirmar
+          </button>
+          <button id="modal-cancel" class="flex-1 px-4 sm:px-6 py-2 border border-gray-300 hover:border-red-600 hover:text-red-600 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert -->
+  <div id="custom-alert" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-md w-full border border-gray-200 shadow-lg">
+      <div class="p-4 sm:p-6">
+        <h3 id="alert-title" class="text-lg sm:text-xl font-light mb-3 sm:mb-4 text-black"></h3>
+        <p id="alert-message" class="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6"></p>
+        <div class="flex justify-end">
+          <button id="alert-ok" class="px-4 sm:px-6 py-2 bg-red-600 text-white border border-red-600 hover:bg-red-700 transition-colors uppercase tracking-wider text-xs sm:text-sm font-light">
+            Aceptar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NRD Data Access Library (load synchronously, no defer) -->
+  <!-- Firebase is bundled within NRD Data Access Library, no need to load it separately -->
+  <!-- Use local files in development (localhost/127.0.0.1), CDN in production -->
+  <script>
+    (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      
+      const nrdDataAccessSrc = isLocalhost 
+        ? '/nrd-data-access/dist/nrd-data-access.js'
+        : 'https://cdn.jsdelivr.net/gh/yosbany/nrd-data-access@main/dist/nrd-data-access.js';
+      
+      console.log('Loading NRD Data Access from:', nrdDataAccessSrc);
+      
+      const script1 = document.createElement('script');
+      script1.src = nrdDataAccessSrc;
+      script1.onerror = function() {
+        console.error('Failed to load NRD Data Access from:', nrdDataAccessSrc);
+      };
+      script1.onload = function() {
+        console.log('NRD Data Access loaded successfully');
+      };
+      document.head.appendChild(script1);
+    })();
+  </script>
+  
+  <!-- NRD Common Library (load synchronously, no defer) -->
+  <!-- Use local files in development (localhost/127.0.0.1), CDN in production -->
+  <script>
+    (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      
+      const nrdCommonSrc = isLocalhost 
+        ? '/nrd-common/dist/nrd-common.js'
+        : 'https://cdn.jsdelivr.net/gh/yosbany/nrd-common@main/dist/nrd-common.js';
+      
+      console.log('Loading NRD Common from:', nrdCommonSrc);
+      
+      const script2 = document.createElement('script');
+      script2.src = nrdCommonSrc;
+      script2.onerror = function() {
+        console.error('Failed to load NRD Common from:', nrdCommonSrc);
+      };
+      script2.onload = function() {
+        console.log('NRD Common loaded successfully');
+      };
+      document.head.appendChild(script2);
+    })();
+  </script>
+  
+  <!-- NRD Common Library Initialization -->
+  <script>
+    // Wait for NRD Common Library to be available and initialize
+    (function() {
+      const maxWait = 10000;
+      const startTime = Date.now();
+      
+      function showLoginFallback() {
+        const redirectingScreen = document.getElementById('redirecting-screen');
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app-screen');
+
+        // If the app is already visible, don't bring back the login screen.
+        if (appScreen && !appScreen.classList.contains('hidden')) return;
+
+        if (redirectingScreen) redirectingScreen.classList.add('hidden');
+        if (loginScreen) loginScreen.classList.remove('hidden');
+      }
+
+      const checkNRDCommon = setInterval(() => {
+        if (typeof window.NRDCommon !== 'undefined') {
+          clearInterval(checkNRDCommon);
+          console.log('NRD Common Library loaded successfully');
+          
+          // Create logger instance FIRST, before anything else uses it
+          // This is critical because AuthService and NavigationService need it
+          window.logger = new window.NRDCommon.Logger('NRD Costos', {
+            logLevel: window.NRDCommon.LOG_LEVELS.INFO,
+            enableColors: true,
+            enableTimestamp: true
+          });
+          
+          // Expose common functions globally for backward compatibility
+          if (window.NRDCommon) {
+            window.showAlert = window.NRDCommon.showAlert;
+            window.showConfirm = window.NRDCommon.showConfirm;
+            window.showError = window.NRDCommon.showError;
+            window.showSuccess = window.NRDCommon.showSuccess;
+            window.showInfo = window.NRDCommon.showInfo;
+            window.showWarning = window.NRDCommon.showWarning;
+            window.showSpinner = window.NRDCommon.showSpinner;
+            window.hideSpinner = window.NRDCommon.hideSpinner;
+            window.formatNumber = window.NRDCommon.formatNumber;
+            window.formatCurrency = window.NRDCommon.formatCurrency;
+            window.formatDecimalWithComma = window.NRDCommon.formatDecimalWithComma;
+            window.parseDecimalWithComma = window.NRDCommon.parseDecimalWithComma;
+            window.escapeHtml = window.NRDCommon.escapeHtml;
+            window.getMonthName = window.NRDCommon.getMonthName;
+            window.formatDate = window.NRDCommon.formatDate;
+            window.isEmployeeActiveInYear = window.NRDCommon.isEmployeeActiveInYear;
+            
+            // Header is now automatically initialized by AuthService
+          }
+          
+          // Initialize NRD Data Access using NRDCommon
+          if (window.NRDCommon.initializeNRD) {
+            window.NRDCommon.initializeNRD().then(success => {
+              if (success) {
+                console.log('NRD Data Access initialized successfully');
+                
+                // Initialize AuthService immediately after NRD is ready
+                // window.logger is already created above, so AuthService can use it
+                if (window.NRDCommon.AuthService && window.nrd) {
+                  try {
+                    window.authService = new window.NRDCommon.AuthService(window.nrd);
+                    console.log('AuthService initialized successfully');
+                  } catch (error) {
+                    console.error('Error initializing AuthService:', error);
+                    // Fallback: hide redirecting screen and show login (only if app not visible)
+                    showLoginFallback();
+                  }
+                } else {
+                  console.error('AuthService or nrd not available');
+                  // Fallback: hide redirecting screen and show login (only if app not visible)
+                  showLoginFallback();
+                }
+              } else {
+                console.error('NRD Data Access initialization failed');
+                // Fallback: hide redirecting screen and show login (only if app not visible)
+                showLoginFallback();
+              }
+            }).catch(error => {
+              console.error('Error initializing NRD Data Access:', error);
+              // Fallback: hide redirecting screen and show login (only if app not visible)
+              showLoginFallback();
+            });
+          } else {
+            console.error('initializeNRD not available in NRDCommon');
+            // Fallback: hide redirecting screen and show login (only if app not visible)
+            showLoginFallback();
+          }
+        } else if (Date.now() - startTime >= maxWait) {
+          clearInterval(checkNRDCommon);
+          console.error('NRD Common Library not loaded after timeout');
+          // Fallback: hide redirecting screen and show login (only if app not visible)
+          showLoginFallback();
+        }
+      }, 100);
+    })();
+  </script>
+  
+  <!-- NRD Data Access Library Initialization -->
+  <!-- IMPORTANT: All modules MUST use window.nrd (NRD Data Access Library) -->
+  <!-- DO NOT access firebase directly in any module - use nrd.products, nrd.recipes, nrd.auth, etc. -->
+  <!-- Firebase is initialized internally by NRD Data Access Library -->
+  
+  <!-- Business Logic Modules (load with defer) -->
+  <script type="module" src="modules/calculations.js" defer></script>
+  
+  <!-- View Modules (load with defer) -->
+  <script type="module" src="views/dashboard/dashboard.js" defer></script>
+  <script type="module" src="views/recipes/recipes.js" defer></script>
+  
+  <!-- Main App (load last with defer) -->
+  <!-- Note: AuthService and NavigationService are now loaded from NRDCommon CDN -->
+  <script type="module" src="app.js?v=1773568749318" defer></script>
+
+  <script>
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+      const appScreen = document.getElementById('app-screen');
+      if (appScreen && !appScreen.classList.contains('hidden')) {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'fixed top-20 left-0 right-0 bg-red-600 text-white p-4 z-50 text-center';
+        errorMsg.textContent = 'Error al cargar la aplicación. Por favor, recarga la página.';
+        document.body.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 5000);
+      }
+    });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js?v=1773568749318')
+          .then(reg => {
+            console.log('Service Worker registered');
+            reg.update();
+          })
+          .catch(err => {
+            console.log('Service Worker registration failed:', err);
+          });
+      });
+    }
+
+    // PWA Install prompt is now handled by NRDCommon.setupInstallButton()
+    
+    // Setup portal link URL based on environment
+    const portalLink = document.getElementById('portal-link');
+    if (portalLink) {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname === '0.0.0.0';
+      portalLink.href = isLocalhost 
+        ? '/nrd-portal/'
+        : 'https://yosbany.github.io/nrd-portal';
+    }
+  </script>
+</body>
+</html>
