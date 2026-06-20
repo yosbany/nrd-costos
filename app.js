@@ -95,76 +95,13 @@ function switchView(viewName) {
   }
 }
 
-/**
- * Initialize app for authenticated user
- */
-let appInitialized = false;
-function initializeAppForUser() {
-  if (appInitialized) {
-    logger.debug('App already initialized, skipping');
-    return;
-  }
-  appInitialized = true;
-  logger.info('Initializing app for authenticated user');
-
-  // Hide redirecting screen and show app screen
-  const redirectingScreen = document.getElementById('redirecting-screen');
-  const appScreen = document.getElementById('app-screen');
-  const loginScreen = document.getElementById('login-screen');
-
-  if (redirectingScreen) redirectingScreen.classList.add('hidden');
-  if (loginScreen) loginScreen.classList.add('hidden');
-  if (appScreen) appScreen.classList.remove('hidden');
-
-  // Initialize navigation
+function initializeAppForUser(user) {
+  logger.info('Initializing app for user', { uid: user.uid, email: user.email });
   initializeNavigation();
-
-  // Switch to default view (dashboard)
-  setTimeout(() => {
-    switchView('dashboard');
-  }, 100);
+  switchView('dashboard');
 }
 
-// Wait for window.nrd and NRDCommon to be available (they're initialized in index.html)
-function waitForNRDAndInitialize() {
-  const maxWait = 10000; // 10 seconds
-  const startTime = Date.now();
-  const checkInterval = 100; // Check every 100ms
-  
-  const checkNRD = setInterval(() => {
-    const nrd = window.nrd;
-    const NRDCommon = window.NRDCommon;
-    
-    if (nrd && nrd.auth && NRDCommon) {
-      clearInterval(checkNRD);
-      logger.info('NRD, auth, and NRDCommon available, setting up onAuthStateChanged');
-      
-      // Also listen to the current auth state immediately
-      const currentUser = nrd.auth.getCurrentUser();
-      if (currentUser) {
-        logger.info('Current user found, initializing immediately', { uid: currentUser.uid, email: currentUser.email });
-        initializeAppForUser();
-      }
-      
-      nrd.auth.onAuthStateChanged((user) => {
-        logger.info('Auth state changed', { hasUser: !!user, uid: user?.uid, email: user?.email });
-        if (user) {
-          initializeAppForUser();
-        } else {
-          logger.debug('User not authenticated, app initialization skipped');
-          appInitialized = false;
-        }
-      });
-    } else if (Date.now() - startTime >= maxWait) {
-      clearInterval(checkNRD);
-      logger.error('NRD, auth, or NRDCommon not available after timeout', { 
-        hasNrd: !!nrd, 
-        hasAuth: !!(nrd && nrd.auth),
-        hasNRDCommon: !!NRDCommon
-      });
-    }
-  }, checkInterval);
-}
-
-// Start waiting for NRD and NRDCommon
-waitForNRDAndInitialize();
+(window.NRDCommon?.startApp || function(fn, opts) {
+  window.__nrdStartQueue = window.__nrdStartQueue || [];
+  window.__nrdStartQueue.push({ onReady: fn, options: opts || {} });
+})(initializeAppForUser, { initDelay: 100 });
