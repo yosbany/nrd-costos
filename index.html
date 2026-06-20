@@ -29,7 +29,7 @@
     // Ensure a global logger exists early so libraries can reference it safely
     window.logger = window.logger || console;
   </script>
-  <link rel="stylesheet" href="assets/styles/styles.css?v=1773568749318">
+  <link rel="stylesheet" href="assets/styles/styles.css?v=1780057171861">
   <meta name="theme-color" content="#dc2626">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
@@ -508,7 +508,7 @@
   
   <!-- Main App (load last with defer) -->
   <!-- Note: AuthService and NavigationService are now loaded from NRDCommon CDN -->
-  <script type="module" src="app.js?v=1773568749318" defer></script>
+  <script type="module" src="app.js?v=1780057171861" defer></script>
 
   <script>
     // Global error handler
@@ -527,7 +527,7 @@
     // Register service worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js?v=1773568749318')
+        navigator.serviceWorker.register('service-worker.js?v=1780057171861')
           .then(reg => {
             console.log('Service Worker registered');
             reg.update();
