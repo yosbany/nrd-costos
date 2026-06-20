@@ -127,6 +127,8 @@ async function renderDashboard() {
   const dashboardContent = document.getElementById('dashboard-content');
   if (!dashboardContent) return;
 
+  showSpinner('Cargando dashboard...');
+  try {
   const data = await loadDashboardData();
   if (!data) {
     dashboardContent.innerHTML = '<p class="text-gray-600 py-4 text-sm">Error al cargar los datos del dashboard</p>';
@@ -319,6 +321,9 @@ async function renderDashboard() {
     </div>
 
   `;
+  } finally {
+    hideSpinner();
+  }
 }
 
 // Initialize dashboard tab

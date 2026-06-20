@@ -192,6 +192,7 @@ async function saveIndirectCost(costId, costData) {
 
 async function viewIndirectCost(costId) {
   logger.debug('Viewing indirect cost', { costId });
+  showSpinner('Cargando costo indirecto...');
   try {
     const cost = await nrd.indirectCosts.getById(costId);
     if (!cost) {
@@ -250,6 +251,8 @@ async function viewIndirectCost(costId) {
   } catch (error) {
     logger.error('Failed to load indirect cost', error);
     await showError('Error al cargar costo indirecto: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -273,6 +276,7 @@ async function deleteIndirectCostHandler(costId) {
 
   const user = getCurrentUser();
   logger.info('Deleting indirect cost', { costId });
+  showSpinner('Eliminando costo indirecto...');
   try {
     const nrd = window.nrd;
     if (!nrd) {
@@ -286,6 +290,8 @@ async function deleteIndirectCostHandler(costId) {
   } catch (error) {
     logger.error('Failed to delete indirect cost', error);
     await showError('Error al eliminar costo indirecto: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -311,6 +317,7 @@ function setupIndirectCostFormHandler() {
     }
 
     logger.debug('Indirect cost form submitted', { costId, name, monthlyAmount, prorationMethod });
+    showSpinner('Guardando costo indirecto...');
     try {
       const costData = { name, monthlyAmount, prorationMethod };
       await saveIndirectCost(costId || null, costData);
@@ -318,6 +325,8 @@ function setupIndirectCostFormHandler() {
     } catch (error) {
       logger.error('Failed to save indirect cost', error);
       await showError('Error al guardar costo indirecto: ' + error.message);
+    } finally {
+      hideSpinner();
     }
   });
 }

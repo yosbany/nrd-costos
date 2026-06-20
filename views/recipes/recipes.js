@@ -1063,6 +1063,7 @@ async function saveRecipe(recipeId, recipeData) {
 
 // View recipe detail
 async function viewRecipe(recipeId) {
+  showSpinner('Cargando receta...');
   try {
     await loadDataForCalculations();
     const recipe = await nrd.recipes.getById(recipeId);
@@ -1271,6 +1272,8 @@ async function viewRecipe(recipeId) {
     }
   } catch (error) {
     await showError('Error al cargar receta: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -1290,11 +1293,14 @@ async function deleteRecipeHandler(recipeId) {
   const confirmed = await showConfirm('Eliminar Receta', '¿Está seguro de eliminar esta receta?');
   if (!confirmed) return;
 
+  showSpinner('Eliminando receta...');
   try {
     await nrd.recipes.delete(recipeId);
     backToRecipes();
   } catch (error) {
     await showError('Error al eliminar receta: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -1383,6 +1389,7 @@ function setupRecipeFormHandler() {
     const laborMinutesInput = document.getElementById('recipe-labor-minutes');
     const laborMinutes = laborMinutesInput ? parseFloat(laborMinutesInput.value || 0) : 0;
 
+    showSpinner('Guardando receta...');
     try {
       const recipeData = { 
         productId, 
@@ -1409,6 +1416,8 @@ function setupRecipeFormHandler() {
       hideRecipeForm();
     } catch (error) {
       await showError('Error al guardar receta: ' + error.message);
+    } finally {
+      hideSpinner();
     }
   });
   

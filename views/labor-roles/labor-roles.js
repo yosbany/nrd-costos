@@ -196,6 +196,7 @@ async function saveLaborRole(roleId, roleData) {
 // View labor role detail
 async function viewLaborRole(roleId) {
   logger.debug('Viewing labor role', { roleId });
+  showSpinner('Cargando rol...');
   try {
     const role = await nrd.laborRoles.getById(roleId);
     if (!role) {
@@ -247,6 +248,8 @@ async function viewLaborRole(roleId) {
   } catch (error) {
     logger.error('Failed to load labor role', error);
     await showError('Error al cargar rol: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -272,6 +275,7 @@ async function deleteLaborRoleHandler(roleId) {
 
   const user = getCurrentUser();
   logger.info('Deleting labor role', { roleId });
+  showSpinner('Eliminando rol...');
   try {
     const nrd = window.nrd;
     if (!nrd) {
@@ -285,6 +289,8 @@ async function deleteLaborRoleHandler(roleId) {
   } catch (error) {
     logger.error('Failed to delete labor role', error);
     await showError('Error al eliminar rol: ' + error.message);
+  } finally {
+    hideSpinner();
   }
 }
 
@@ -310,6 +316,7 @@ function setupLaborRoleFormHandler() {
     }
 
     logger.debug('Labor role form submitted', { roleId, name, hourlyCost });
+    showSpinner('Guardando rol...');
     try {
       const roleData = { name, hourlyCost };
       await saveLaborRole(roleId || null, roleData);
@@ -317,6 +324,8 @@ function setupLaborRoleFormHandler() {
     } catch (error) {
       logger.error('Failed to save labor role', error);
       await showError('Error al guardar rol: ' + error.message);
+    } finally {
+      hideSpinner();
     }
   });
 }
